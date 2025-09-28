@@ -1,0 +1,36 @@
+@startuml
+Administrator -> AdminController : POST /api/admin/physician/create\n(request + file)
+activate AdminController
+
+AdminController -> PhysicianService : create(request, file)
+activate PhysicianService
+
+PhysicianService -> SpringBootDepartmentRepository : findBySigla(request.departmentSigla)
+activate SpringBootDepartmentRepository
+SpringBootDepartmentRepository --> PhysicianService : Department
+deactivate SpringBootDepartmentRepository
+
+PhysicianService -> SpringBootSpecialityRepository : findByName(request.speciality)
+activate SpringBootSpecialityRepository
+SpringBootSpecialityRepository --> PhysicianService : Speciality
+deactivate SpringBootSpecialityRepository
+
+PhysicianService -> FileSystem : ensure upload dir exists
+PhysicianService -> FileSystem : transferTo(destination)
+
+PhysicianService -> SpringBootPhysicianRepository : save(physician)
+activate SpringBootPhysicianRepository
+SpringBootPhysicianRepository --> PhysicianService : persisted Physician
+deactivate SpringBootPhysicianRepository
+
+PhysicianService --> AdminController : Physician
+deactivate PhysicianService
+
+AdminController -> PhysicianViewMapper : toPhysicianView(physician)
+activate PhysicianViewMapper
+PhysicianViewMapper --> AdminController : PhysicianView
+deactivate PhysicianViewMapper
+
+AdminController --> Administrator : HTTP 201 Created + PhysicianView
+deactivate AdminController
+@enduml

@@ -1,0 +1,204 @@
+{
+	"info": {
+		"_postman_id": "31f2b26f-497d-4857-b3ba-bb6e6f735ab0",
+		"name": "PSOFT WP1A",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "45054804"
+	},
+	"item": [
+		{
+			"name": "Patient Search Physician",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_admin}}",
+						"type": "default"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/api/patient/search/physician/6",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"patient",
+						"search",
+						"physician",
+						"6"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Admin Search Physician",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_admin}}",
+						"type": "default"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/api/admin/search/physician/6",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"admin",
+						"search",
+						"physician",
+						"6"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Admin Create Physician",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_admin}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"fullName\": \"João Silva\",\n  \"username\": \"joaosilva\",\n  \"password\": \"senhaSegura123!\",\n  \"email\": \"joao.silva@exemplo.com\",\n  \"street\": \"Rua das Flores, 123\",\n  \"city\": \"Lisboa\",\n  \"district\": \"Santa Maria Maior\",\n  \"zip\": \"1100-123\",\n  \"country\": \"Portugal\",\n  \"phoneNumber\": \"912345678\",\n  \"phoneType\": \"HOME\",\n  \"departmentSigla\": \"CARD\",\n  \"speciality\": \"Cardiologia\",\n  \"startTime\": \"08:00\",\n  \"endTime\": \"17:00\"\n}\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/admin/create/physician",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"admin",
+						"create",
+						"physician"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Admin Login",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"// === Captura JWT para Admin ===",
+							"let jsonAdmin = pm.response.json();",
+							"let tokenAdmin = jsonAdmin.token;",
+							"// Se não vier no body, tenta ler do header",
+							"if (!tokenAdmin) {",
+							"    let hdrAdmin = pm.response.headers.get(\"Authorization\") || pm.response.headers.get(\"authorization\");",
+							"    tokenAdmin = hdrAdmin && hdrAdmin.split(\" \")[1];",
+							"}",
+							"console.log(\"✅ Captured JWT Admin:\", tokenAdmin);",
+							"// Guarda na variável de ambiente 'jwt_admin'",
+							"pm.environment.set(\"jwt_admin\", tokenAdmin);",
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"username\": \"admin1\",\n  \"password\": \"Password1!\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/public/login",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"public",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Patient Seach Physician By Name or Speciality",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							""
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_patient}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/api/patient/search/physicians?term=cardiologia",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"patient",
+						"search",
+						"physicians"
+					],
+					"query": [
+						{
+							"key": "term",
+							"value": "cardiologia"
+						}
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}

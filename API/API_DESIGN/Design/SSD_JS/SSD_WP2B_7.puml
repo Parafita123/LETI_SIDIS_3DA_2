@@ -1,0 +1,47 @@
+@startuml
+Patient -> PatientController : POST /api/patient/appointment/create\n{date, startTime, consultationType,\nphysicianFullName}
+activate PatientController
+
+PatientController -> AppointmentService : P_create(request)
+activate AppointmentService
+
+AppointmentService -> AppointmentDateTimeValidator : validateDate(date)\nvalidateTimeSlot(date, start, end)
+activate AppointmentDateTimeValidator
+AppointmentDateTimeValidator --> AppointmentService : validated date/time
+deactivate AppointmentDateTimeValidator
+
+AppointmentService -> SpringBootPatientRepository : findByBaseUserUsername(username)
+activate SpringBootPatientRepository
+SpringBootPatientRepository --> AppointmentService : Patient
+deactivate SpringBootPatientRepository
+
+AppointmentService -> SpringBootPhysicianRepository : findByBaseUserFullName(physicianFullName)
+activate SpringBootPhysicianRepository
+SpringBootPhysicianRepository --> AppointmentService : Physician
+deactivate SpringBootPhysicianRepository
+
+AppointmentService -> SpringBootAppointmentRepository : existsByPhysicianAndDateAndStartTime(physician, date, start)
+activate SpringBootAppointmentRepository
+SpringBootAppointmentRepository --> AppointmentService : boolean exists
+deactivate SpringBootAppointmentRepository
+
+alt no conflict
+  AppointmentService -> SpringBootAppointmentRepository : save(new Appointment(...))
+  activate SpringBootAppointmentRepository
+  SpringBootAppointmentRepository --> AppointmentService : Appointment ap
+  deactivate SpringBootAppointmentRepository
+else conflict
+  AppointmentService --> PatientController : throw InvalidAppointmentException
+end
+
+AppointmentService --> PatientController : Appointment ap
+deactivate AppointmentService
+
+PatientController -> AppointmentViewMapper : toAppointmentView(ap)
+activate AppointmentViewMapper
+AppointmentViewMapper --> PatientController : AppointmentView
+deactivate AppointmentViewMapper
+
+PatientController --> Patient : HTTP 200 OK + AppointmentView
+deactivate PatientController
+@enduml

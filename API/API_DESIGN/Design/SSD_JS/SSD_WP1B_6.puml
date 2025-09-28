@@ -1,0 +1,44 @@
+@startuml
+Administrator -> AdminController : PUT /api/admin/physician/{id}\n(request + optional file)
+activate AdminController
+
+AdminController -> PhysicianService : update(id, request, file?)
+activate PhysicianService
+
+PhysicianService -> SpringBootPhysicianRepository : findById(id)
+activate SpringBootPhysicianRepository
+SpringBootPhysicianRepository --> PhysicianService : existing Physician
+deactivate SpringBootPhysicianRepository
+
+PhysicianService -> SpringBootDepartmentRepository : findBySigla(request.departmentSigla)
+activate SpringBootDepartmentRepository
+SpringBootDepartmentRepository --> PhysicianService : Department
+deactivate SpringBootDepartmentRepository
+
+PhysicianService -> SpringBootSpecialityRepository : findByName(request.speciality)
+activate SpringBootSpecialityRepository
+SpringBootSpecialityRepository --> PhysicianService : Speciality
+deactivate SpringBootSpecialityRepository
+
+alt file provided
+  PhysicianService -> FileSystem : delete existing photo if any
+  PhysicianService -> FileSystem : ensure upload dir exists
+  PhysicianService -> FileSystem : transferTo(newDestination)
+end
+
+PhysicianService -> SpringBootPhysicianRepository : save(updatedPhysician)
+activate SpringBootPhysicianRepository
+SpringBootPhysicianRepository --> PhysicianService : persisted Physician
+deactivate SpringBootPhysicianRepository
+
+PhysicianService --> AdminController : updated Physician
+deactivate PhysicianService
+
+AdminController -> PhysicianViewMapper : toPhysicianView(physician)
+activate PhysicianViewMapper
+PhysicianViewMapper --> AdminController : PhysicianView
+deactivate PhysicianViewMapper
+
+AdminController --> Administrator : HTTP 200 OK + PhysicianView
+deactivate AdminController
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+
+ Administrator-> AdminController : GET /api/admin/physicians/top5\n?startDate={startDate}\n&endDate={endDate}
+activate AdminController
+
+AdminController -> AppointmentService : getTop5Physicians(startDateStr,\nendDateStr)
+activate AppointmentService
+
+alt valid date range
+  AppointmentService -> SpringBootAppointmentRepository : findTop5PhysiciansByDateBetween(\n  startDate, endDate,\n  PageRequest.of(0, 5)\n)
+  activate SpringBootAppointmentRepository
+
+  SpringBootAppointmentRepository --> AppointmentService : List<PhysicianCount>
+  deactivate SpringBootAppointmentRepository
+
+  AppointmentService --> AdminController : List<PhysicianCount>
+  deactivate AppointmentService
+
+  AdminController --> Administrator : HTTP 200 OK + [PhysicianCount JSON]
+else invalid date format or range
+  AppointmentService --> AdminController : throws InvalidDateException
+  deactivate AppointmentService
+
+  AdminController --> Administrator : HTTP 400 Bad Request
+end
+
+deactivate AdminController
+@enduml

@@ -1,0 +1,174 @@
+{
+	"info": {
+		"_postman_id": "b5ab5155-eb4d-4cb0-afa3-c5df6addb6ea",
+		"name": "PSOFT WP1B",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "45054804"
+	},
+	"item": [
+		{
+			"name": "TOP5",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_admin}}",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/api/admin/report/top5?startDate=02/06/2025&endDate=08/06/2026",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"admin",
+						"report",
+						"top5"
+					],
+					"query": [
+						{
+							"key": "startDate",
+							"value": "02/06/2025"
+						},
+						{
+							"key": "endDate",
+							"value": "08/06/2026"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Available Slots",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_patient}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n  \"date\": \"08/07/2025\",\n  \"physicianFullName\": \"Ana Silva\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/patient/available-slots",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"patient",
+						"available-slots"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Admin Create Physician",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_admin}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "physician",
+							"value": "{\n  \"fullName\": \"João Silva\",\n  \"username\": \"joao.silva\",\n  \"password\": \"senhaSegura123!\",\n  \"email\": \"joaosilva@exemplo.com\",\n  \"street\": \"Rua das Flores, 123\",\n  \"city\": \"Lisboa\",\n  \"district\": \"Santa Maria Maior\",\n  \"zip\": \"1100-123\",\n  \"country\": \"Portugal\",\n  \"phoneNumber\": \"912345898\",\n  \"phoneType\": \"HOME\",\n  \"departmentSigla\": \"CARD\",\n  \"speciality\": \"Cardiologia\",\n  \"startTime\": \"09:00\",\n  \"endTime\": \"17:00\"\n}\n",
+							"contentType": "application/json",
+							"type": "text"
+						},
+						{
+							"key": "file",
+							"type": "file",
+							"src": "/home/supraowner/Imagens/Capturas de ecrã/Captura de ecrã de 2025-06-07 19-58-38.png"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/admin/physician/create",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"admin",
+						"physician",
+						"create"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Edit Physician",
+			"request": {
+				"method": "PATCH",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer {{jwt_admin}}",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "updateRequest",
+							"value": "{\"fullName\":\"Sofia Silva\"  }\n",
+							"contentType": "application/json",
+							"type": "text"
+						},
+						{
+							"key": "file",
+							"type": "file",
+							"src": "/home/supraowner/Imagens/Capturas de ecrã/Captura de ecrã de 2025-05-30 17-16-48.png",
+							"disabled": true
+						}
+					]
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/admin/physician/edit/11",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"admin",
+						"physician",
+						"edit",
+						"11"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
