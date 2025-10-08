@@ -1,0 +1,479 @@
+{
+	"info": {
+		"_postman_id": "f023700b-381a-4fa8-b54c-837d524064cc",
+		"name": "PSOFT - WP#1 Postman",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "40544317"
+	},
+	"item": [
+		{
+			"name": "Criar Médico",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTc0ODM3MjYyNSwiZXhwIjoxNzQ4Mzc2MjI1fQ.GLvW6RlFjOap-Eu4_h9CpstEDBFslPnUBaoBrj99vtU",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"fullName\": \"Dr. Gustavo Silva\",\r\n    \"specialtyId\": 10,  \r\n    \"departmentId\": 10, \r\n    \"email\": \"gustavoemail@gmail.com\",\r\n    \"phoneNumber\": \"910289120\",\r\n    \"address\": \"RUa dos Cavalos, Baguim\",\r\n    \"workStartTime\": \"10:00\",\r\n    \"workEndTime\": \"19:00\",\r\n    \"optionalDescription\": \"Psiquiatra dotado.\"\r\n}\r\n",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/physicians",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"physicians"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Ver detalhes de médico pelo seu ID",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code should be 200 OK\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response should be a valid JSON\", function () {\r",
+							"    pm.response.to.be.json;\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response body should contain an 'id'\", function () {\r",
+							"    const responseJson = pm.response.json();\r",
+							"    pm.expect(responseJson).to.have.property('id');\r",
+							"    // Compara com o ID que esperavas (o que foi guardado na variável)\r",
+							"    pm.expect(responseJson.id).to.eql(parseInt(pm.collectionVariables.get(\"createdPhysicianId\")));\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response body should contain 'fullName'\", function () {\r",
+							"    const responseJson = pm.response.json();\r",
+							"    pm.expect(responseJson).to.have.property('fullName');\r",
+							"    pm.expect(responseJson.fullName).to.not.be.empty;\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response body should contain 'departmentAcronym'\", function () {\r",
+							"    const responseJson = pm.response.json();\r",
+							"    pm.expect(responseJson).to.have.property('departmentAcronym');\r",
+							"    pm.expect(responseJson.departmentAcronym).to.not.be.empty;\r",
+							"});\r",
+							"\r",
+							" pm.test(\"Status code for non-existent physician should be 404 Not Found\", function () {\r",
+							"     pm.response.to.have.status(404);\r",
+							" });"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwYXRpZW50MSIsImlhdCI6MTc0ODAzMjUxMSwiZXhwIjoxNzQ4MDM2MTExfQ.hBulNf4mI5sjwDQlaBlcsArQcuBGap0FEQrT904bvH8",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": ""
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/physicians/1",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"physicians",
+						"1"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Pesquisar médico por nome ou especialidade",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status code should be 200 OK\", function () {\r",
+							"    pm.response.to.have.status(200);\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Response should be a valid JSON array\", function () {\r",
+							"    pm.response.to.be.json;\r",
+							"    const responseJson = pm.response.json();\r",
+							"    pm.expect(responseJson).to.be.an('array');\r",
+							"});\r",
+							"\r",
+							"pm.test(\"If results found, each physician should have 'id' and 'fullName'\", function () {\r",
+							"    const responseJson = pm.response.json();\r",
+							"    if (responseJson.length > 0) {\r",
+							"        responseJson.forEach(function(physician) {\r",
+							"            pm.expect(physician).to.have.property('id');\r",
+							"            pm.expect(physician).to.have.property('fullName');\r",
+							"            pm.expect(physician).to.have.property('departmentAcronym');\r",
+							"        });\r",
+							"    }\r",
+							"});\r",
+							"\r",
+							"pm.test(\"All returned physicians should have the specialty 'Cardiologia'\", function () {\r",
+							"    const responseJson = pm.response.json();\r",
+							"    if (responseJson.length > 0) {\r",
+							"        responseJson.forEach(function(physician) {\r",
+							"            pm.expect(physician.specialtyName.toLowerCase()).to.include('cardiologia'.toLowerCase());\r",
+							"        });\r",
+							"    }\r",
+							"});"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwYXRpZW50MSIsImlhdCI6MTc0ODAzNTQxOCwiZXhwIjoxNzQ4MDM5MDE4fQ.4TreTMn73AvYUZKWlylg17pePvYaXGlzTx02EfTRdZQ",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "\r\n"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/physicians/search?name=Gustavo",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"physicians",
+						"search"
+					],
+					"query": [
+						{
+							"key": "name",
+							"value": "Gustavo"
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "TOKEN ADMIN",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status 200\", () => pm.response.to.have.status(200));\r",
+							"const json = pm.response.json();\r",
+							"pm.test(\"Token presente\", () => pm.expect(json.token).to.be.a(\"string\"));\r",
+							"\r",
+							"pm.environment.set(\"jwt_token\", json.token);"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Authorization",
+						"value": "",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"username\":\"admin\",\r\n    \"password\":\"adminpass\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/auth/login",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "TOKEN PACIENT",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Status 200\", () => pm.response.to.have.status(200));\r",
+							"const json = pm.response.json();\r",
+							"pm.test(\"Token presente\", () => pm.expect(json.token).to.be.a(\"string\"));\r",
+							"\r",
+							"pm.environment.set(\"jwt_token\", json.token);"
+						],
+						"type": "text/javascript",
+						"packages": {}
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Authorization",
+						"value": "",
+						"type": "text",
+						"disabled": true
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"username\":\"patient2\",\r\n    \"password\":\"patientpass2\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/auth/login",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"auth",
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Atualizar dados do médico",
+			"request": {
+				"method": "PUT",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTc0ODY5NDg0MCwiZXhwIjoxNzQ4Njk4NDQwfQ.mT1MLSWOzkG2-P2gZ2biCh2QfdDRpNvvw4ksHXk7IbM",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"fullName\": \"Dr. João Silva (Atualizado)\",\r\n    \"specialtyId\": 2, // ID de uma especialidade existente (ex: Neurologia)\r\n    \"departmentId\": 1, // ID de um departamento existente\r\n    \"email\": \"joao.silva.novo@clinic.com\",\r\n    \"phoneNumber\": \"987654320\",\r\n    \"address\": \"Rua Nova da Saúde, 456, Porto\",\r\n    \"workStartTime\": \"09:30\",\r\n    \"workEndTime\": \"17:30\",\r\n    \"optionalDescription\": \"Cardiologista experiente, agora com foco em investigação.\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/physicians/100",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"physicians",
+						"100"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Obter foto do médico",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTc0ODcxMDMxNSwiZXhwIjoxNzQ4NzEzOTE1fQ.1nP18x9YpK5UGn-2Ro3dzwG1Cknwuy0zvnxzUFKnCe8",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/api/physicians/photo/d4751d48-c303-49b1-97c8-3d86f62c1b9b.jpg",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"physicians",
+						"photo",
+						"d4751d48-c303-49b1-97c8-3d86f62c1b9b.jpg"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Médicos com maior número de consultas",
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJhZG1pbiIsImlhdCI6MTc0ODcxMjgwNywiZXhwIjoxNzQ4NzE2NDA3fQ.EchGRu0HSfIW6ocEbE8FyCU3e4DWrzUzGQpkZJHeiOg",
+						"type": "text"
+					}
+				],
+				"url": {
+					"raw": "http://localhost:8080/api/physicians/top-appointments?",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"physicians",
+						"top-appointments"
+					],
+					"query": [
+						{
+							"key": "",
+							"value": null
+						}
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Ver consultas disponíveis",
+			"protocolProfileBehavior": {
+				"disableBodyPruning": true
+			},
+			"request": {
+				"method": "GET",
+				"header": [
+					{
+						"key": "Content-Type",
+						"value": "application/json",
+						"type": "text"
+					},
+					{
+						"key": "Authorization",
+						"value": "Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJwYXRpZW50MiIsImlhdCI6MTc0OTE0NDkyNiwiZXhwIjoxNzQ5MTQ4NTI2fQ.Tq_mA_YSMLmwWS8lrDoyJ6G3EmTn4qVoA9zpYL6zOY4",
+						"type": "text"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"username\":\"patient2\",\r\n    \"password\":\"patientpass2\"\r\n}"
+				},
+				"url": {
+					"raw": "http://localhost:8080/api/physicians/1/available-slots",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "8080",
+					"path": [
+						"api",
+						"physicians",
+						"1",
+						"available-slots"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"variable": [
+		{
+			"key": "createdPhysicianId",
+			"value": ""
+		}
+	]
+}
