@@ -6,6 +6,7 @@ Person(uiPatient, "UI Patient")
 Person(uiPhysician, "UI Physician")
 Person(uiAppointments, "UI Appointments")
 Person(uiAnonymous, "UI Anonymous")
+Person(uiAppointment_Record, "UI Appointment_Record")
 
 ' --- Main System ---
 System_Boundary(lmsSystem, "LMS System") {
@@ -20,6 +21,7 @@ Rel(uiPatient, systemLMS, "Uses")
 Rel(uiPhysician, systemLMS, "Uses")
 Rel(uiAppointments, systemLMS, "Uses")
 Rel(uiAnonymous, systemLMS, "Uses")
+Rel(uiAppointment_Record, systemLMS, "Uses")
 
 Rel(systemLMS, filesystemAPI, "Communicates with", "API")
 
