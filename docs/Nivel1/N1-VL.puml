@@ -1,0 +1,27 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+' --- External Users (Actors) ---
+Person(uiPatient, "UI Patient")
+Person(uiPhysician, "UI Physician")
+Person(uiAppointments, "UI Appointments")
+Person(uiAnonymous, "UI Anonymous")
+
+' --- Main System ---
+System_Boundary(lmsSystem, "LMS System") {
+    Component(systemLMS, "LMS System", "System (C4)", "Learning Management System core component")
+}
+
+' --- External Component / API ---
+Component_Ext(filesystemAPI, "Filesystem API", "External API")
+
+' --- Relationships ---
+Rel(uiPatient, systemLMS, "Uses")
+Rel(uiPhysician, systemLMS, "Uses")
+Rel(uiAppointments, systemLMS, "Uses")
+Rel(uiAnonymous, systemLMS, "Uses")
+
+Rel(systemLMS, filesystemAPI, "Communicates with", "API")
+
+@enduml
+
