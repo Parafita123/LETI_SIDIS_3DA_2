@@ -1,0 +1,56 @@
+@startuml C4_Level2_Containers_ClinicSystem
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+' Define Atores
+Person(patient, "Paciente", "Um paciente registado na clínica.")
+Person(admin, "Administrador", "Um funcionário que gere o sistema.")
+Person(physician_actor, "Médico", "Um médico que usa o sistema para ver consultas e gerir registos.")
+
+System_Boundary(clinic_system, "Sistema da Clínica") {
+
+    ' Containers de Frontend e Gateway
+    Container(api_gateway, "API Gateway", "Spring Cloud Gateway", "Ponto de entrada único para a API. Encaminha pedidos, lida com autenticação.")
+
+    ' Containers de Microsserviços
+    Container(identity_service, "Identity Service", "Java, Spring Boot", "Lida com autenticação, autorização e gestão de utilizadores (Users).")
+    Container(physician_service, "Physician Service", "Java, Spring Boot", "Lida com a gestão de médicos, departamentos e especialidades.")
+    Container(patient_service, "Patient Service", "Java, Spring Boot", "Lida com a gestão dos perfis dos pacientes.")
+    Container(scheduling_service, "Scheduling Service", "Java, Spring Boot", "Lida com o agendamento de consultas e cálculo de horários disponíveis.")
+    Container(records_service, "Clinical Records Service", "Java, Spring Boot", "Lida com a criação e consulta de registos clínicos (diagnósticos, prescrições).")
+
+    ' Containers de Bases de Dados
+    ContainerDb(user_db, "Base de Dados de Utilizadores", "H2", "Armazena credenciais e perfis de utilizadores.")
+    ContainerDb(physician_db, "Base de Dados de Médicos", "H2", "Armazena perfis de médicos, departamentos e especialidades.")
+    ContainerDb(patient_db, "Base de Dados de Pacientes", "H2", "Armazena perfis de pacientes.")
+    ContainerDb(scheduling_db, "Base de Dados de Agendamento", "H2", "Armazena informações sobre as consultas (appointments).")
+    ContainerDb(records_db, "Base de Dados de Registos Clínicos", "H2", "Armazena os detalhes clínicos de cada consulta.")
+}
+
+' Relações dos Atores com o Sistema
+Rel(patient, api_gateway, "Usa", "HTTPS/Postman")
+Rel(admin, api_gateway, "Usa", "HTTPS/Postman")
+Rel(physician_actor, api_gateway, "Usa", "HTTPS/Postman")
+
+' Relações API Gateway -> Microsserviços
+Rel(api_gateway, identity_service, "Encaminha pedidos de auth", "JSON/HTTPS")
+Rel(api_gateway, physician_service, "Encaminha pedidos de médicos", "JSON/HTTPS")
+Rel(api_gateway, patient_service, "Encaminha pedidos de pacientes", "JSON/HTTPS")
+Rel(api_gateway, scheduling_service, "Encaminha pedidos de agendamento", "JSON/HTTPS")
+Rel(api_gateway, records_service, "Encaminha pedidos de registos clínicos", "JSON/HTTPS")
+
+' Relações Microsserviços -> Bases de Dados
+Rel(identity_service, user_db, "Lê e escreve em", "JDBC")
+Rel(physician_service, physician_db, "Lê e escreve em", "JDBC")
+Rel(patient_service, patient_db, "Lê e escreve em", "JDBC")
+Rel(scheduling_service, scheduling_db, "Lê e escreve em", "JDBC")
+Rel(records_service, records_db, "Lê e escreve em", "JDBC")
+
+' Relações ENTRE Microsserviços (Comunicação Síncrona - Chamadas REST)
+' Assumindo que o Scheduling Service precisa de dados do Physician Service e do Patient Service
+Rel(scheduling_service, physician_service, "Obtém horário do médico", "JSON/HTTPS (Chamada REST)")
+Rel(scheduling_service, patient_service, "Valida existência do paciente", "JSON/HTTPS (Chamada REST)")
+Rel(records_service, scheduling_service, "Valida existência da consulta", "JSON/HTTPS (Chamada REST)")
+
+
+@enduml

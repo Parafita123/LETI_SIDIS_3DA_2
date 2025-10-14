@@ -1,0 +1,28 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+' --- External Users (Actors) ---
+Person(uiPatient, "UI Patient")
+Person(uiPhysician, "UI Physician")
+Person(uiAdmin, "UI Admin")
+Person(uiAnonymous, "UI Anonymous")
+
+' --- Main System ---
+System_Boundary(lmsSystem, "LMS System") {
+    Component(systemLMS, "Clínica Hospitalar", "Fornece aos seus utilizadores, diferentes ferramentas, como gerenciamento de perfil, pesquisa de utilizador e marcação de consultas. ")
+}
+
+' --- External Component / API ---
+Component_Ext(registo, "", "O admin pode registar médicos enquanto um utilizador anónimo pode se registar como paciente")
+Component_Ext(marcaçãp, "Marcação de consulta", "O admin pode marcar consultas para os pacientes da clínica e os pacientes podem cancelá-las caso necessário.")
+Component_Ext(filesystemAPI, "", "")
+' --- Relationships ---
+Rel(uiPatient, systemLMS, "Gere as suas consultas e analisa médicos")
+Rel(uiPhysician, systemLMS, "Regista apontamentos das consultas realizadas pelos seus pacientes e aponta detalhes das mesmas ")
+Rel(uiAdmin, systemLMS, "Regista os médicos, gere-os, gere os pacientes e as suas consultas e gere as estatísticas da clínica")
+Rel(uiAnonymous, systemLMS, "Regista-se na clinica como paciente")
+
+Rel(systemLMS, registo, "processa os registos", "")
+
+@enduml
+
