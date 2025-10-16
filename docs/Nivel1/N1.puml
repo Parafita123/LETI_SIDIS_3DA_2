@@ -1,28 +1,23 @@
-@startuml
-!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+@startuml C4_Level1_Context_ClinicSystem
 
-' --- External Users (Actors) ---
-Person(uiPatient, "UI Patient")
-Person(uiPhysician, "UI Physician")
-Person(uiAdmin, "UI Admin")
-Person(uiAnonymous, "UI Anonymous")
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
 
-' --- Main System ---
-System_Boundary(lmsSystem, "LMS System") {
-    Component(systemLMS, "Clínica Hospitalar", "Fornece aos seus utilizadores, diferentes ferramentas, como gerenciamento de perfil, pesquisa de utilizador e marcação de consultas. ")
-}
+' Define Atores (Pessoas)
+Person(patient, "Paciente", "Um paciente registado na clínica.")
+Person(physician_actor, "Médico", "Um profissional de saúde que presta serviços.")
+Person(admin, "Administrador", "Um funcionário da clínica que gere o sistema.")
+Person(anonymous_user, "Utilizador Anónimo", "Uma pessoa que visita o sistema sem estar autenticada.")
 
-' --- External Component / API ---
-Component_Ext(registo, "", "O admin pode registar médicos enquanto um utilizador anónimo pode se registar como paciente")
-Component_Ext(marcaçãp, "Marcação de consulta", "O admin pode marcar consultas para os pacientes da clínica e os pacientes podem cancelá-las caso necessário.")
-Component_Ext(filesystemAPI, "", "")
-' --- Relationships ---
-Rel(uiPatient, systemLMS, "Gere as suas consultas e analisa médicos")
-Rel(uiPhysician, systemLMS, "Regista apontamentos das consultas realizadas pelos seus pacientes e aponta detalhes das mesmas ")
-Rel(uiAdmin, systemLMS, "Regista os médicos, gere-os, gere os pacientes e as suas consultas e gere as estatísticas da clínica")
-Rel(uiAnonymous, systemLMS, "Regista-se na clinica como paciente")
+' Define o Sistema Central
+System(clinic_system, "Sistema da Clínica Hospitalar", "Permite a gestão de pacientes, médicos, agendamento de consultas e registos clínicos.")
 
-Rel(systemLMS, registo, "processa os registos", "")
+' Define Sistemas Externos (se houver)
 
+' Define as Relações
+Rel(anonymous_user, clinic_system, "Regista-se como paciente")
+Rel(patient, clinic_system, "Gere as suas consultas e pesquisa médicos")
+Rel(physician_actor, clinic_system, "Regista os detalhes clínicos das consultas")
+Rel(admin, clinic_system, "Gere médicos, pacientes, consultas e vê estatísticas")
+
+' Relação com o Sistema Externo
 @enduml
-
