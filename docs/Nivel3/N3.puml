@@ -1,0 +1,47 @@
+@startuml C4_Component_Patient_Optimized
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+skinparam backgroundcolor white
+title Patient Service\n[Container - C4 Level 3: Component Diagram]
+
+' ==== CONTAINER ====
+Container_Boundary(patient_container, "Patient Service") {
+
+    ' ==== ENTRY LAYER ====
+    Component(security_filter, "Security Filter", "Spring Security", "Intercepts and validates authentication for all incoming requests")
+
+    Component(patient_controller, "Patient Controller", "Spring REST Controller", "Handles HTTP requests and maps them to service operations")
+
+    Component(exception_handler, "Exception Handler", "Spring @ControllerAdvice", "Handles and standardizes application exceptions")
+
+    ' ==== BUSINESS LAYER ====
+    Component(patient_service, "Patient Service", "Spring Service", "Implements patient business logic")
+
+    Component(dto, "Patient DTOs", "Data Transfer Objects", "Encapsulates data exchanged between Controller and Service layers")
+
+    Component(validation, "Validation", "Jakarta Validation", "Validates patient request data before processing")
+
+    ' ==== DATA LAYER ====
+    Component(patient_repository, "Patient Repository", "Spring Data JPA", "Handles persistence and data access operations")
+
+}
+
+' ==== EXTERNAL COMPONENT ====
+ContainerDb(database, "Patient Database", "PostgreSQL", "Stores patient records and related data")
+
+' ==== RELATIONSHIPS ====
+' Entry flow
+Rel(security_filter, patient_controller, "Filters & authenticates requests")
+Rel(patient_controller, validation, "Validates input data")
+Rel(patient_controller, dto, "Uses")
+Rel(patient_controller, patient_service, "Invokes business methods")
+Rel(patient_controller, exception_handler, "Delegates exception handling")
+
+' Business flow
+Rel(patient_service, dto, "Uses")
+Rel(patient_service, patient_repository, "Reads/Writes patient data")
+
+' Data flow
+Rel(patient_repository, database, "Reads/Writes", "JPA/SQL")
+
+@enduml
