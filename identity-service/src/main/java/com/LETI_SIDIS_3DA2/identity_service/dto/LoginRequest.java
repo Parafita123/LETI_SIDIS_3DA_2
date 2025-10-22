@@ -1,4 +1,4 @@
-package com.LETI_SIDIS_3DA_2.physician_service.dto;
+package com.LETI_SIDIS_3DA2.identity_service.dto;
 
 public class LoginRequest {
     private String username;

@@ -1,4 +1,4 @@
-package com.LETI_SIDIS_3DA2.Patient_Service.dto;
+package com.LETI_SIDIS_3DA2.identity_service.dto;
 
 public class LoginResponse {
     private final String token;

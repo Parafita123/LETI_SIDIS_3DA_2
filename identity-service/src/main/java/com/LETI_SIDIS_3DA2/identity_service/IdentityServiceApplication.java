@@ -1,0 +1,13 @@
+package com.LETI_SIDIS_3DA2.identity_service;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class IdentityServiceApplication {
+
+	public static void main(String[] args) {
+		SpringApplication.run(IdentityServiceApplication.class, args);
+	}
+
+}
