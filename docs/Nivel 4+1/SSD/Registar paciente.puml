@@ -1,0 +1,50 @@
+@startuml
+title Registo de Paciente com Autenticação JWT (Visão Detalhada)
+
+actor "Utilizador Autenticado\n(ex: Recepcionista)" as User
+participant ":Frontend" as Frontend
+participant ":API Gateway" as Gateway
+participant ":AuthenticationService" as AuthService
+participant PatientController as Controller
+participant PatientServiceImpl as Service
+participant PatientRepository as Repo
+database ":H2Database" as DB
+
+
+autonumber
+
+group Fase 1: Autenticação e Obtenção do Token
+
+    User -> Frontend : Inicia login com credenciais
+    Frontend -> Gateway : 1. POST /auth/login (user, pass)
+    Gateway -> AuthService : 1.1. Validar credenciais
+    AuthService --> Gateway : 1.2. Retorna Token JWT
+    Gateway --> Frontend : 1.3. Retorna Token JWT
+    Frontend -> Frontend : 1.4. Armazena o token de forma segura
+    Frontend --> User : Login bem-sucedido
+
+end
+
+group Fase 2: Registo de Paciente (Ação Autorizada)
+
+    User -> Frontend : Submete formulário de registo do paciente
+
+    Frontend -> Gateway : 2. POST /patients (body JSON, \n**Authorization: Bearer <JWT>**)
+    Gateway -> Gateway : 3. Valida a assinatura e expiração do JWT
+    Gateway -> Controller : 4. POST / (body JSON)
+    Controller -> Controller : 5. Framework valida e cria o PatientCreateDto
+    Controller -> Service : 6. register(createDto)
+    Service -> Service : 7. Cria a entidade Patient a partir do DTO
+    Service -> Repo : 8. save(patient)
+    Repo -> DB : 8.1. INSERT na tabela de pacientes
+    Repo --> Service : 8.2. Retorna `savedPatient` (com ID)
+    Service -> Service : 9. Mapeia `savedPatient` para `PatientDto`
+    Service --> Controller : 10. Retorna o `PatientDto`
+
+    Controller --> Gateway : 11. Retorna HTTP 201 Created + JSON
+
+    Gateway --> Frontend : 12. Retorna HTTP 201 Created + JSON
+    Frontend --> User : 13. Exibe mensagem de sucesso
+
+end
+@enduml

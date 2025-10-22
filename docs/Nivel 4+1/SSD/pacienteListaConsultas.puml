@@ -1,0 +1,57 @@
+@startuml
+title Ver Detalhes de um Paciente do Próprio Médico (a partir do Token)
+
+actor "Médico" as User
+participant ":Frontend" as Frontend
+participant ":API Gateway" as Gateway
+participant ":AuthenticationService" as AuthService
+participant PatientController as Controller
+participant PatientServiceImpl as Service
+participant PatientRepository as Repo
+database ":H2Database" as DB
+
+autonumber
+
+group Fase 1: Autenticação do Médico
+
+    User -> Frontend : Inicia login com credenciais
+    Frontend -> Gateway : 1. POST /auth/login
+    Gateway -> AuthService : 1.1. Validar credenciais
+    AuthService --> Gateway : 1.2. Retorna Token JWT (contendo **physician_id**)
+    Gateway --> Frontend : 1.3. Retorna Token JWT
+    Frontend -> Frontend : 1.4. Armazena o token de forma segura
+    Frontend --> User : Login bem-sucedido
+
+end
+
+group Fase 2: Obtenção dos Detalhes do Paciente (Ação Autorizada e Validada)
+
+    User -> Frontend : Solicita detalhes de um paciente específico (ID)
+
+    Frontend -> Gateway : 2. GET /patients/{id_do_paciente} (**Authorization: Bearer <JWT>**)
+
+    Gateway -> Gateway : 3. Valida a assinatura e expiração do JWT
+
+    Gateway -> Gateway : 4. Extrai **physician_id** do payload do token
+
+    Gateway -> Controller : 5. GET /{id_do_paciente} (Header: **X-Physician-ID: {id_do_medico}**)
+
+    Controller -> Service : 6. getPatientDetailsForPhysician({id_do_paciente}, {id_do_medico})
+    Service -> Repo : 7. findByIdAndPhysicianId({id_do_paciente}, {id_do_medico})
+
+    ' A consulta SQL valida a autorização, garantindo que o médico está ligado ao paciente.
+    Repo -> DB : 7.1. SELECT p.* FROM patients p JOIN appointments a ON p.id = a.patient_id WHERE p.id = {id_do_paciente} AND a.physician_id = {id_do_medico}
+
+    DB --> Repo : 7.2. Retorna dados do paciente (se a ligação existir)
+    Repo --> Service : 7.3. Retorna entidade Patient
+    Service -> Service : 8. Mapeia a entidade para PatientDto
+    Service --> Controller : 9. Retorna PatientDto
+
+    Controller --> Gateway : 10. HTTP 200 OK + JSON com PatientDto
+
+    Gateway --> Frontend : 11. HTTP 200 OK + JSON
+
+    Frontend --> User : 12. Exibe os detalhes do paciente
+
+end
+@enduml

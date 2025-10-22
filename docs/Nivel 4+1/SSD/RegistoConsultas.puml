@@ -1,0 +1,56 @@
+@startuml
+title Paciente a Ver os Seus Registos de Consultas (a partir do Token)
+
+actor "Paciente" as User
+participant ":Frontend" as Frontend
+participant ":API Gateway" as Gateway
+participant ":AuthenticationService" as AuthService
+participant AppointmentRecordController as Controller
+participant AppointmentRecordServiceImpl as Service
+participant AppointmentRecordRepository as Repo
+database "H2Database" as DB
+
+autonumber
+
+group Fase 1: Autenticação do Paciente
+
+    User -> Frontend : Inicia login com credenciais
+    Frontend -> Gateway : 1. POST /auth/login
+    Gateway -> AuthService : 1.1. Validar credenciais
+    AuthService --> Gateway : 1.2. Retorna Token JWT (contendo **patient_id**)
+    Gateway --> Frontend : 1.3. Retorna Token JWT
+    Frontend -> Frontend : 1.4. Armazena o token de forma segura
+    Frontend --> User : Login bem-sucedido
+
+end
+
+group Fase 2: Obtenção dos Registos de Consultas (Ação Autorizada e Filtrada)
+
+    User -> Frontend : Clica em "Meus Registos de Consultas"
+
+    Frontend -> Gateway : 2. GET /appointment-records/mine (**Authorization: Bearer <JWT>**)
+
+    Gateway -> Gateway : 3. Valida a assinatura e expiração do JWT
+
+    Gateway -> Gateway : 4. Extrai **patient_id** do payload do token
+
+    Gateway -> Controller : 5. GET /mine (Header: **X-Patient-ID: {id_do_paciente}**)
+
+    Controller -> Service : 6. getMyAppointmentRecords({id_do_paciente})
+    Service -> Repo : 7. findByPatientId({id_do_paciente})
+
+    Repo -> DB : 7.1. SELECT * FROM appointment_records WHERE patient_id = {id_do_paciente}
+
+    DB --> Repo : 7.2. Retorna lista de dados de registos
+    Repo --> Service : 7.3. Retorna List<AppointmentRecord>
+    Service -> Service : 8. Mapeia List<AppointmentRecord> para List<AppointmentRecordDto>
+    Service --> Controller : 9. Retorna List<AppointmentRecordDto>
+
+    Controller --> Gateway : 10. HTTP 200 OK + JSON com List<AppointmentRecordDto>
+
+    Gateway --> Frontend : 11. HTTP 200 OK + JSON
+
+    Frontend --> User : 12. Exibe a lista dos seus registos de consultas
+
+end
+@enduml
