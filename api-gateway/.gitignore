@@ -3,7 +3,7 @@ target/
 .mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
 !**/src/test/**/target/
-data/
+
 ### STS ###
 .apt_generated
 .classpath
@@ -31,14 +31,3 @@ build/
 
 ### VS Code ###
 .vscode/
-
-# Database
-*.mv.db
-*.db
-
-# OS
-Thumbs.db
-.DS_Store
-
-# Logs
-*.log
