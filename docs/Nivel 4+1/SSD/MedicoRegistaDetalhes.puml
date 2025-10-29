@@ -4,7 +4,7 @@ title Médico a Registar Detalhes de uma Consulta (a partir do Token)
 actor "Médico" as User
 participant ":Frontend" as Frontend
 participant ":API Gateway" as Gateway
-participant ":AuthenticationService" as AuthService
+participant ":IdentityService" as IdentityService
 participant AppointmentRecordController as Controller
 participant AppointmentRecordServiceImpl as Service
 participant AppointmentRecordRepository as Repo
@@ -16,8 +16,8 @@ group Fase 1: Autenticação do Médico
 
     User -> Frontend : Inicia login com credenciais
     Frontend -> Gateway : 1. POST /auth/login
-    Gateway -> AuthService : 1.1. Validar credenciais
-    AuthService --> Gateway : 1.2. Retorna Token JWT (contendo **physician_id**)
+    Gateway -> IdentityService : 1.1. Validar credenciais
+    IdentityService --> Gateway : 1.2. Retorna Token JWT (contendo **physician_id**)
     Gateway --> Frontend : 1.3. Retorna Token JWT
     Frontend -> Frontend : 1.4. Armazena o token de forma segura
     Frontend --> User : Login bem-sucedido
