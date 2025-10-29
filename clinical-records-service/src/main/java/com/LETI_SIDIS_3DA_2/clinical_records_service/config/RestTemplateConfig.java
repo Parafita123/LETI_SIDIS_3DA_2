@@ -1,4 +1,5 @@
-package com.LETI_SIDIS_3DA2.scheduling_service.config;
+// Em RestTemplateConfig.java (do clinical-records-service)
+package com.LETI_SIDIS_3DA_2.clinical_records_service.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -7,7 +8,6 @@ import org.springframework.web.client.RestTemplate;
 @Configuration
 public class RestTemplateConfig {
 
-    // Injeta o interceptor que acabámos de criar
     private final JwtForwardingInterceptor jwtForwardingInterceptor;
 
     public RestTemplateConfig(JwtForwardingInterceptor jwtForwardingInterceptor) {
@@ -17,8 +17,7 @@ public class RestTemplateConfig {
     @Bean
     public RestTemplate restTemplate() {
         RestTemplate restTemplate = new RestTemplate();
-        // Adiciona o nosso interceptor à lista de interceptors do RestTemplate
-        restTemplate.getInterceptors().add(jwtForwardingInterceptor);
+        restTemplate.getInterceptors().add(jwtForwardingInterceptor); // Adiciona o interceptor
         return restTemplate;
     }
 }

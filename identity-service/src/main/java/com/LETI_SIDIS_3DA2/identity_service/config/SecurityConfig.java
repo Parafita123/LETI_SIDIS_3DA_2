@@ -42,25 +42,21 @@ public class SecurityConfig {
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable())
+                .csrf(csrf -> csrf.disable()) // Desativa CSRF, que é baseado em sessão
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) // MUITO IMPORTANTE: Garante que não cria sessões
                 .authorizeHttpRequests(auth -> auth
-
-                        .requestMatchers(POST, "/api/patients").permitAll()
-
                         .requestMatchers(
-                                "/api/auth/**",
-                                "/h2-console/**",
-                                "/swagger-ui.html",
-                                "/v3/api-docs/**"
+                                "/api/auth/**", // Permite o login
+                                "/h2-console/**"
+                                // ... outros permitAll ...
                         ).permitAll()
-
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(daoAuthProvider())
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Garante que o teu filtro JWT é adicionado
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class)
-                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
-        ;
+                // Para a consola H2 funcionar
+                .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()));
 
         return http.build();
     }

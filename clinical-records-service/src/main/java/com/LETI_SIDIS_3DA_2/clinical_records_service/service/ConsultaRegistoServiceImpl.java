@@ -1,45 +1,49 @@
 package com.LETI_SIDIS_3DA_2.clinical_records_service.service;
 
-// Entidades do próprio serviço
 import com.LETI_SIDIS_3DA_2.clinical_records_service.domain.ConsultaRegisto;
-
-// DTOs do próprio serviço
 import com.LETI_SIDIS_3DA_2.clinical_records_service.dto.CreateConsultaRegistoDTO;
 import com.LETI_SIDIS_3DA_2.clinical_records_service.dto.ConsultaRegistoOutputDTO;
-
-// Exceções customizadas
+import com.LETI_SIDIS_3DA_2.clinical_records_service.dto.AppointmentDetailsDTO;
 import com.LETI_SIDIS_3DA_2.clinical_records_service.exception.DuplicateResourceException;
-import com.LETI_SIDIS_3DA_2.clinical_records_service.exception.ResourceNotFoundException; // Para o futuro
-
-// Repositórios
+import com.LETI_SIDIS_3DA_2.clinical_records_service.exception.ResourceNotFoundException;
+import com.LETI_SIDIS_3DA_2.clinical_records_service.exception.ServiceUnavailableException;
 import com.LETI_SIDIS_3DA_2.clinical_records_service.repository.ConsultaRegistoRepository;
-
-// Anotações Spring
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestTemplate;
 
-// Utilitários Java
 import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
-public class ConsultaRegistoServiceImpl implements ConsultaRegistoService {
+public class ConsultaRegistoServiceImpl implements ConsultaRegistoService { // Garante que o nome da interface aqui está correto
+
     private final ConsultaRegistoRepository recordRepository;
+    private final RestTemplate restTemplate;
+
+    @Value("${services.scheduling.url}")
+    private String schedulingServiceUrl;
 
     @Autowired
-    public ConsultaRegistoServiceImpl(ConsultaRegistoRepository recordRepository) {
+    public ConsultaRegistoServiceImpl(ConsultaRegistoRepository recordRepository, RestTemplate restTemplate) {
         this.recordRepository = recordRepository;
+        this.restTemplate = restTemplate;
     }
 
-    @Override
+    // --- IMPLEMENTAÇÃO DOS MÉTODOS DA INTERFACE ---
+
+    @Override // Adiciona @Override
     @Transactional
     public ConsultaRegistoOutputDTO createRecord(CreateConsultaRegistoDTO dto) {
-        // TODO: Validação. Antes de criar, deveríamos verificar se a consulta (appointment) com 'dto.getConsultaId()'
-        // existe e está "COMPLETED". Isto exigiria uma chamada REST para o Scheduling Service.
-        // Por agora, vamos assumir que os dados são válidos.
+        AppointmentDetailsDTO appointment = getAppointmentDetails(dto.getConsultaId());
 
-        // Verifica se já existe um registo para esta consulta
+        if (!"COMPLETED".equalsIgnoreCase(appointment.getStatus())) {
+            throw new IllegalArgumentException("Só é possível criar registos para consultas com o estado 'COMPLETED'. O estado atual é: " + appointment.getStatus());
+        }
+
         if (recordRepository.findByConsultaId(dto.getConsultaId()).isPresent()) {
             throw new DuplicateResourceException("Já existe um registo para a consulta com ID: " + dto.getConsultaId());
         }
@@ -56,22 +60,21 @@ public class ConsultaRegistoServiceImpl implements ConsultaRegistoService {
         return convertToDTO(savedRecord);
     }
 
-    @Override
+    @Override // Adiciona @Override
     @Transactional(readOnly = true)
     public Optional<ConsultaRegistoOutputDTO> getRecordByConsultaId(Long consultaId) {
         return recordRepository.findByConsultaId(consultaId)
-                .map(this::convertToDTO);
+                .map(this::convertToDTO); // Chama o método convertToDTO
     }
+
+    // --- MÉTODO HELPER 'convertToDTO' (EM FALTA) ---
 
     private ConsultaRegistoOutputDTO convertToDTO(ConsultaRegisto record) {
         if (record == null) {
             return null;
         }
 
-        // Declara a variável dto
         ConsultaRegistoOutputDTO dto = new ConsultaRegistoOutputDTO();
-
-        // Agora usa os setters que acabaste de criar no DTO de saída
         dto.setId(record.getId());
         dto.setConsultaId(record.getConsultaId());
         dto.setDiagnosis(record.getDiagnosis());
@@ -79,6 +82,24 @@ public class ConsultaRegistoServiceImpl implements ConsultaRegistoService {
         dto.setPrescriptions(record.getPrescriptions());
         dto.setCreatedAt(record.getCreatedAt());
 
-        return dto; // Retorna o objeto DTO preenchido
+        return dto;
+    }
+
+    // --- MÉTODO HELPER para chamar o Scheduling Service (já tinhas) ---
+    private AppointmentDetailsDTO getAppointmentDetails(Long consultaId) {
+        try {
+            String url = schedulingServiceUrl + "/" + consultaId;
+            AppointmentDetailsDTO appointmentDetails = restTemplate.getForObject(url, AppointmentDetailsDTO.class);
+
+            if (appointmentDetails == null) {
+                throw new ResourceNotFoundException("Consulta com ID " + consultaId + " não encontrada no serviço de agendamento (resposta vazia).");
+            }
+            return appointmentDetails;
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new ResourceNotFoundException("Consulta com ID " + consultaId + " não encontrada no serviço de agendamento.");
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new ServiceUnavailableException("Serviço de Agendamento (Scheduling Service) indisponível no momento.");
+        }
     }
 }
