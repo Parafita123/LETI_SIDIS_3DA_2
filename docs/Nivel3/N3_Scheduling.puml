@@ -1,0 +1,55 @@
+@startuml C4_Component_Scheduling_Service
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+skinparam backgroundcolor white
+title Scheduling Service\n[Container - C4 Level 3: Component Diagram]
+
+' ===========================
+' CONTAINER
+' ===========================
+Container_Boundary(scheduling_container, "Scheduling Service") {
+
+    ' ==== ENTRY LAYER ====
+    Component(security_filter, "Security Filter", "Spring Security / JwtAuthenticationFilter", "Intercepts and validates authentication for all incoming requests")
+
+    Component(schedule_controller, "Schedule Controller", "Spring REST Controller", "Handles HTTP requests for managing appointments (CRUD)")
+
+    Component(exception_handler, "Exception Handler", "Spring @ControllerAdvice", "Handles and standardizes application exceptions (e.g., time conflicts, invalid data)")
+
+    ' ==== BUSINESS LAYER ====
+    Component(schedule_service, "Schedule Service", "Spring Service", "Implements scheduling logic: prevents time conflicts, validates participants, manages appointments")
+
+    Component(validation, "Validation", "Jakarta Validation", "Validates schedule data such as date, time, physicianId, and patientId")
+
+    Component(dto, "Schedule DTOs", "Data Transfer Objects", "Encapsulates appointment information exchanged between layers")
+
+    ' ==== DATA LAYER ====
+    Component(schedule_repository, "Schedule Repository", "Spring Data JPA", "Handles data persistence for appointments")
+
+}
+
+' ==== EXTERNAL COMPONENTS ====
+ContainerDb(database, "Scheduling Database", "PostgreSQL", "Stores appointments and scheduling information")
+
+System_Ext(patient_service, "Patient Service", "External Microservice", "Provides patient data via REST API")
+
+System_Ext(physician_service, "Physician Service", "External Microservice", "Provides physician data via REST API")
+
+' ==== RELATIONSHIPS ====
+' Entry flow
+Rel(security_filter, schedule_controller, "Filters & authenticates requests")
+Rel(schedule_controller, validation, "Validates input data")
+Rel(schedule_controller, dto, "Uses")
+Rel(schedule_controller, schedule_service, "Invokes business logic")
+Rel(schedule_controller, exception_handler, "Delegates error handling")
+
+' Business flow
+Rel(schedule_service, dto, "Uses DTOs for data transfer")
+Rel(schedule_service, schedule_repository, "Reads/Writes appointment data")
+Rel(schedule_service, patient_service, "Fetches/validates patient information", "REST API")
+Rel(schedule_service, physician_service, "Fetches/validates physician information", "REST API")
+
+' Data flow
+Rel(schedule_repository, database, "Reads/Writes", "JPA/SQL")
+
+@enduml
