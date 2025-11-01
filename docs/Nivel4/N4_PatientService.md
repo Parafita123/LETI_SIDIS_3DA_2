@@ -4,13 +4,15 @@
 
 **File:** [PatientService](../../Patient-Service/src/main/java/com/LETI_SIDIS_3DA2/Patient_Service/service/PatientServiceImpl.java)  
 **Technology:** Spring Service  
-**Responsibility:** Implements patient business logic
+**Responsibility:** Implements patient business logic  
+**Base Endpoint:** `/api/patients`
 
 ---
 
 ### Overview
 The `PatientService` component manages all patient-related business operations such as registration, update, and retrieval.  
 It bridges the Controller layer and the Repository layer, enforcing business rules and handling exceptions.
+
 
 ---
 
@@ -33,6 +35,9 @@ It bridges the Controller layer and the Repository layer, enforcing business rul
 - Exception handling for not found resources
 - Read/Write operations orchestration
 - No interface segregation (direct implementation)
+- Enforces domain separation (no coupling with User or Physician entities)
+- Uses DTOs to prevent entity exposure
+- Implements Single Responsibility and consistent exception handling
 
 ---
 
