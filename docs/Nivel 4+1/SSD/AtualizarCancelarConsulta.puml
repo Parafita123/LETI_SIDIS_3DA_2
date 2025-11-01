@@ -1,0 +1,86 @@
+@startuml
+title Atualizar ou Cancelar uma Consulta (Arquitetura Segura e Detalhada)
+
+actor "Patient/Admin" as User
+participant ":Frontend" as Frontend
+participant ":API Gateway" as Gateway
+participant ":IdentityService" as IdentitySvc
+participant AppointmentController as Controller
+participant AppointmentServiceImpl as Service
+participant AppointmentRepository as Repo
+database "H2Database" as DB
+
+autonumber
+
+group Fase 1: Autenticação do Utilizador (Paciente ou Admin)
+
+    User -> Frontend : Inicia login com credenciais
+    Frontend -> Gateway : 1. POST /auth/login
+    Gateway -> IdentitySvc : 1.1. Validar credenciais
+    IdentitySvc --> Gateway : 1.2. Retorna Token JWT (contendo **user_id** e **role**)
+    Gateway -> Frontend : 1.3. Retorna Token JWT
+    Frontend --> User : Login bem-sucedido
+
+end
+
+group Fase 2: Atualizar Consulta (Ação Autorizada)
+
+    User -> Frontend : Submete formulário com novos dados da consulta
+
+    Frontend -> Gateway : 2. PUT /appointments/{id} (JSON, **Authorization: Bearer <JWT>**)
+
+    Gateway -> Gateway : 3. Valida o token e extrai **user_id** e **role**
+
+    Gateway -> Controller : 4. PUT /{id} (JSON, Header: X-User-ID, X-User-Role)
+
+    Controller -> Service : 5. updateAppointment({id}, {dto}, {user_id}, {role})
+
+    ' --- Início da Validação de Segurança ---
+    Service -> Repo : 6. findById({id})
+    Repo --> Service : 6.1. Retorna a entidade Appointment (com o patient_id original)
+    Service -> Service : 6.2. **Verifica se (role == ADMIN ou appointment.patient_id == user_id)**
+    ' --- Fim da Validação ---
+
+    ' Se a validação for bem-sucedida, o serviço atualiza a entidade.
+    Service -> Service : 7. Modifica o objeto Appointment com os novos dados
+    Service -> Repo : 8. save(appointment)
+    Repo -> DB : 8.1. UPDATE appointments SET ... WHERE id={id}
+
+    Service --> Controller : 9. Retorna AppointmentDto atualizado
+
+    Controller --> Gateway : 10. HTTP 200 OK + JSON
+    Gateway --> Frontend : 11. HTTP 200 OK + JSON
+    Frontend --> User : 12. Exibe mensagem "Consulta atualizada com sucesso!"
+
+end
+
+group Fase 3: Cancelar Consulta (Ação Autorizada)
+
+    User -> Frontend : Clica em "Cancelar Consulta"
+
+    Frontend -> Gateway : 13. DELETE /appointments/{id} (**Authorization: Bearer <JWT>**)
+
+    Gateway -> Gateway : 14. Valida o token e extrai **user_id** e **role**
+
+    Gateway -> Controller : 15. DELETE /{id} (Header: X-User-ID, X-User-Role)
+
+    Controller -> Service : 16. cancelAppointment({id}, {user_id}, {role})
+
+    ' --- Início da Validação de Segurança (idêntica à de atualização) ---
+    Service -> Repo : 17. findById({id})
+    Repo --> Service : 17.1. Retorna a entidade Appointment
+    Service -> Service : 17.2. **Verifica se (role == ADMIN ou appointment.patient_id == user_id)**
+    ' --- Fim da Validação ---
+
+    ' Se a validação for bem-sucedida, o serviço apaga a entidade.
+    Service -> Repo : 18. deleteById({id})
+    Repo -> DB : 18.1. DELETE FROM appointments WHERE id={id}
+
+    Service --> Controller : 19. Retorna confirmação (void)
+
+    Controller --> Gateway : 20. HTTP 204 No Content
+    Gateway --> Frontend : 21. HTTP 204 No Content
+    Frontend --> User : 22. Exibe mensagem "Consulta cancelada com sucesso!"
+
+end
+@enduml
