@@ -2,7 +2,7 @@
 
 ## Patient Service
 
-**File:** [PatientService](../../Patient-Service/src/main/java/com/LETI_SIDIS_3DA2/Patient_Service/service/PatientServiceImpl.java)  
+**File:** [PatientService](../../../Patient-Service/src/main/java/com/LETI_SIDIS_3DA2/Patient_Service/service/PatientServiceImpl.java)  
 **Technology:** Spring Service  
 **Responsibility:** Implements patient business logic  
 **Base Endpoint:** `/api/patients`
