@@ -15,7 +15,6 @@ import com.LETI_SIDIS_3DA2.Patient_Service.security.JwtUtil;
 import com.LETI_SIDIS_3DA2.Patient_Service.service.UserDetailsServiceImpl;
 import java.io.IOException;
 
-@Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;

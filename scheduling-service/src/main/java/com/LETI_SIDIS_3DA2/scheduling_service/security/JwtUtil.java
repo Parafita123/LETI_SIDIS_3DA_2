@@ -1,52 +1,71 @@
 package com.LETI_SIDIS_3DA2.scheduling_service.security;
 
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.stereotype.Service;
+import org.springframework.stereotype.Component;
 
-import java.security.Key;
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
+import java.util.Collection;
 import java.util.Date;
+import java.util.List;
+import java.util.Objects;
 
-@Service
+@Component
 public class JwtUtil {
 
-    @Value("${jwt.secret}")
-    private String secret;
+    private final SecretKey key;
 
-    @Value("${jwt.expiration-ms}")
-    private long expiration;
-
-    private Key getSigningKey() {
-        return Keys.hmacShaKeyFor(secret.getBytes());
-    }
-
-    public String generateToken(UserDetails userDetails) {
-        return Jwts.builder()
-                .setSubject(userDetails.getUsername())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + expiration))
-                .signWith(getSigningKey(), SignatureAlgorithm.HS256)
-                .compact();
+    public JwtUtil(@Value("${jwt.secret}") String secret) {
+        // HS256 precisa de >= 256 bits
+        this.key = Keys.hmacShaKeyFor(secret.getBytes(StandardCharsets.UTF_8));
     }
 
     public String extractUsername(String token) {
-        return Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
-                .build()
-                .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
+        return extractAllClaims(token).getSubject();
     }
 
-    public boolean isTokenValid(String token, UserDetails userDetails) {
-        var claims = Jwts.parserBuilder()
-                .setSigningKey(getSigningKey())
+    /**
+     * Lê as authorities do token.
+     * Vai primeiro à claim "authorities" e, se não existir, faz fallback para "roles".
+     */
+    public List<String> extractRoles(String token) {
+        Claims claims = extractAllClaims(token);
+
+        Object raw = claims.get("authorities"); // claim principal
+        if (raw == null) {
+            raw = claims.get("roles");          // fallback
+        }
+        if (raw instanceof Collection<?> col) {
+            return col.stream()
+                    .filter(Objects::nonNull)
+                    .map(Object::toString)
+                    .toList();
+        }
+        return List.of();
+    }
+
+    public boolean isExpired(String token) {
+        Date exp = extractAllClaims(token).getExpiration();
+        return exp != null && exp.before(new Date());
+    }
+
+    public boolean isTokenSignatureValid(String token) {
+        try {
+            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private Claims extractAllClaims(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(key)
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
-        return claims.getSubject().equals(userDetails.getUsername())
-                && claims.getExpiration().after(new Date());
     }
 }

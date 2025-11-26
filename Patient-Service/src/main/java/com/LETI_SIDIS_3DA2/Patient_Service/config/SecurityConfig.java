@@ -2,26 +2,36 @@ package com.LETI_SIDIS_3DA2.Patient_Service.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
-import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 
-import static org.springframework.security.config.Customizer.withDefaults;
-
 @Configuration
-@EnableWebSecurity
 public class SecurityConfig {
 
     @Bean
-    public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/h2-console/**").permitAll()
-                        .anyRequest().authenticated()
-                )
-                .csrf(csrf -> csrf.ignoringRequestMatchers("/h2-console/**"))
+                // Sem sessão; só para evitar surpresas
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
+                // CSRF off (necessário para H2 Console e para chamadas POST via Postman sem cookie CSRF)
+                .csrf(csrf -> csrf.disable())
+
+                // Permite o H2 Console (usa frames)
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
-                .httpBasic(withDefaults());
+
+                .authorizeHttpRequests(auth -> auth
+                        // CORS preflight (se tiveres UI a chamar)
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+
+                        // Endpoints públicos úteis em dev
+                        .requestMatchers("/h2-console/**", "/actuator/**").permitAll()
+
+                        // TODO: como estamos em Gateway-only, abrimos tudo internamente
+                        .anyRequest().permitAll()
+                );
 
         return http.build();
     }

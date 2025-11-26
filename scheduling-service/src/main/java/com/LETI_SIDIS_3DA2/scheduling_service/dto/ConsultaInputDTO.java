@@ -10,6 +10,9 @@ import java.time.LocalDateTime;
 
 public class ConsultaInputDTO {
     @NotNull(message = "O ID do médico é obrigatório.")
+    private Long patientId;
+
+    @NotNull(message = "O ID do médico é obrigatório.")
     private Long physicianId;
 
     @NotNull(message = "A data e hora da consulta são obrigatórias.")
@@ -28,6 +31,9 @@ public class ConsultaInputDTO {
 
     public Long getPhysicianId() { return physicianId; }
     public void setPhysicianId(Long physicianId) { this.physicianId = physicianId; }
+
+    public Long getPatientId() { return patientId; }
+    public void setPatientId(Long patientId) { this.patientId = patientId; }
 
     public LocalDateTime getDateTime() { return dateTime; }
     public void setDateTime(LocalDateTime dateTime) { this.dateTime = dateTime; }

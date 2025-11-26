@@ -28,6 +28,7 @@ public class PatientController {
     }
 
     @PostMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<EntityModel<PatientDto>> register(
             @Valid @RequestBody PatientCreateDto in) {
         PatientDto dto = svc.register(in);
