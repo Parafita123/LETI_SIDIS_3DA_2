@@ -1,0 +1,64 @@
+@startuml
+title Saga + CQRS: Registo de Paciente
+
+actor "Admin" as User
+participant "API Gateway" as Gateway
+participant "Physician Command API" as PhyCmd
+database "Physician Write DB\n(H2)" as WDB
+queue "Message Broker\n(RabbitMQ)" as Broker
+participant "Identity Service" as IdentitySvc
+participant "Physician Query API" as PhyQuery
+database "Physician Read DB\n(H2)" as RDB
+
+== Comando: Registar Medico ==
+
+User -> Gateway : POST /physician\n(nome, email, ...)
+Gateway -> PhyCmd : POST /physician\n(nome, email, ...)
+
+activate PhyCmd
+PhyCmd -> WDB : INSERT Physician\n(status = PENDING_VALIDATION)
+WDB --> PhyCmd : OK
+
+PhyCmd -> Broker : publish PhysicianRegistrationStarted
+deactivate PhyCmd
+
+== Saga: Validação e Criação de Identidade ==
+
+Broker -> IdentitySvc : PhysicianRegistrationStarted
+activate IdentitySvc
+IdentitySvc -> IdentitySvc : Validar e criar\ncredenciais de acesso
+IdentitySvc -> Broker : publish PhysicianIdentityCreated
+deactivate IdentitySvc
+
+== Orquestrador (Command) finaliza o Registo ==
+
+Broker -> PhyCmd : PhysicianIdentityCreated
+activate PhyCmd
+PhyCmd -> WDB : UPDATE Physician\nstatus = ACTIVE
+WDB --> PhyCmd : OK
+
+PhyCmd -> Broker : publish PhysicianRegistered
+deactivate PhyCmd
+
+== Atualização dos Read Models (CQRS) ==
+
+Broker -> PhyQuery : PatientRegistered
+activate PhyQuery
+PhyQuery -> RDB : UPSERT PhysicianView\n(Dados otimizados para leitura)
+RDB --> PhyQuery : OK
+deactivate PhyQuery
+
+== Query: Visualizar Detalhes do Physician ==
+
+User -> Gateway : GET /physicians/{id}
+Gateway -> PhyQuery : GET /physicians/{id}
+
+activate PhyQuery
+PhyQuery -> RDB : SELECT * FROM PhysicianView\nWHERE id = ...
+RDB --> PhyQuery : JSON do Physician
+PhyQuery --> Gateway : 200 OK\nDTO do Physician
+deactivate PhyQuery
+
+Gateway --> User : 200 OK\nExibe dados do medico
+
+@enduml

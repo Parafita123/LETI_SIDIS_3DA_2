@@ -1,0 +1,64 @@
+@startuml
+title Saga + CQRS: Registo de Paciente
+
+actor "Utilizador Autenticado" as User
+participant "API Gateway" as Gateway
+participant "Patient Command API" as PatCmd
+database "Patient Write DB\n(H2)" as WDB
+queue "Message Broker\n(RabbitMQ)" as Broker
+participant "Identity Service" as IdentitySvc
+participant "Patient Query API" as PatQuery
+database "Patient Read DB\n(H2)" as RDB
+
+== Comando: Registar Paciente ==
+
+User -> Gateway : POST /patients\n(nome, email, nif, ...)
+Gateway -> PatCmd : POST /patients\n(nome, email, nif, ...)
+
+activate PatCmd
+PatCmd -> WDB : INSERT Patient\n(status = PENDING_VALIDATION)
+WDB --> PatCmd : OK
+
+PatCmd -> Broker : publish PatientRegistrationStarted
+deactivate PatCmd
+
+== Saga: Validação e Criação de Identidade ==
+
+Broker -> IdentitySvc : PatientRegistrationStarted
+activate IdentitySvc
+IdentitySvc -> IdentitySvc : Validar e criar\ncredenciais de acesso
+IdentitySvc -> Broker : publish PatientIdentityCreated
+deactivate IdentitySvc
+
+== Orquestrador (Command) finaliza o Registo ==
+
+Broker -> PatCmd : PatientIdentityCreated
+activate PatCmd
+PatCmd -> WDB : UPDATE Patient\nstatus = ACTIVE
+WDB --> PatCmd : OK
+
+PatCmd -> Broker : publish PatientRegistered
+deactivate PatCmd
+
+== Atualização dos Read Models (CQRS) ==
+
+Broker -> PatQuery : PatientRegistered
+activate PatQuery
+PatQuery -> RDB : UPSERT PatientView\n(Dados otimizados para leitura)
+RDB --> PatQuery : OK
+deactivate PatQuery
+
+== Query: Visualizar Detalhes do Paciente ==
+
+User -> Gateway : GET /patients/{id}
+Gateway -> PatQuery : GET /patients/{id}
+
+activate PatQuery
+PatQuery -> RDB : SELECT * FROM PatientView\nWHERE id = ...
+RDB --> PatQuery : JSON do Paciente
+PatQuery --> Gateway : 200 OK\nDTO do Paciente
+deactivate PatQuery
+
+Gateway --> User : 200 OK\nExibe dados do paciente
+
+@enduml

@@ -4,12 +4,12 @@ title Saga + CQRS: Paciente agenda consulta e vê lista de consultas
 actor "Paciente" as PatientUI
 participant "API Gateway" as APIGW
 participant "Scheduling Command API" as SchedCmd
-database "Scheduling Write DB" as WDB
+database "Scheduling Write Postgresql" as WDB
 queue "Message Broker (AMQP)" as Broker
 participant "Patient Service" as PatSvc
 participant "Physician Service" as DocSvc
 participant "Scheduling Query API (instância 1)" as SchedQ1
-database "Consultations Read DB #1" as RDB1
+database "Consultations Read Postgresql #1" as RDB1
 
 == Comando: agendar consulta ==
 
