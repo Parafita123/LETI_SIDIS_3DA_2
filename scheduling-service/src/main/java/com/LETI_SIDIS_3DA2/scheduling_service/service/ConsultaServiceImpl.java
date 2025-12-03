@@ -39,7 +39,7 @@ public class ConsultaServiceImpl implements ConsultaServiceIntf {
             throw new IllegalArgumentException("Não é possível marcar consultas no passado.");
         }
 
-        // ✅ usa os IDs recebidos no body; deixa de depender de username/autenticação
+        // Validação básica dos IDs recebidos
         PhysicianDetailsDTO physician = physicianClient.getById(dto.getPhysicianId());
         PatientDetailsDTO patient   = patientClient.getById(dto.getPatientId());
 
@@ -129,8 +129,10 @@ public class ConsultaServiceImpl implements ConsultaServiceIntf {
     @Override
     @Transactional(readOnly = true)
     public List<ConsultaOutPutDTO> getUpcomingAppointments() {
+        // 🔧 IMPORTANTE: evitar que erros ao ir buscar dados de pacientes/médicos
+        // se traduzam em 403 neste endpoint.
         return consultaRepo.findByDateTimeAfterOrderByDateTimeAsc(LocalDateTime.now()).stream()
-                .map(this::toDto)
+                .map(this::toDtoSafe)   // usa uma versão "segura" do toDto
                 .collect(Collectors.toList());
     }
 
@@ -187,11 +189,15 @@ public class ConsultaServiceImpl implements ConsultaServiceIntf {
                 .collect(Collectors.toList());
     }
 
+    /**
+     * Versão "completa", usada quando queremos obrigatoriamente os detalhes
+     * do paciente e médico. Pode lançar exceções.
+     */
     private ConsultaOutPutDTO toDto(Consulta c) {
         var patient = patientClient.getById(c.getPatientId());
         var physician = physicianClient.getById(c.getPhysicianId());
 
-        var dto = new ConsultaOutPutDTO();
+        ConsultaOutPutDTO dto = new ConsultaOutPutDTO();
         dto.setId(c.getId());
         dto.setDateTime(c.getDateTime());
         dto.setDuration(c.getDuration());
@@ -202,6 +208,47 @@ public class ConsultaServiceImpl implements ConsultaServiceIntf {
         dto.setPatientName(patient.getFullName());
         dto.setPhysicianId(physician.getId());
         dto.setPhysicianName(physician.getFullName());
+        return dto;
+    }
+
+    /**
+     * Versão "segura" para endpoints públicos/abertos como /proximas:
+     * se algum serviço remoto devolver 403/404, não propagamos, apenas
+     * devolvemos o que soubermos (IDs e eventualmente nomes a null).
+     */
+    private ConsultaOutPutDTO toDtoSafe(Consulta c) {
+        PatientDetailsDTO patient = null;
+        PhysicianDetailsDTO physician = null;
+
+        try {
+            patient = patientClient.getById(c.getPatientId());
+        } catch (RuntimeException ex) {
+            // aqui poderias fazer um log.warn(...) se quiseres
+        }
+
+        try {
+            physician = physicianClient.getById(c.getPhysicianId());
+        } catch (RuntimeException ex) {
+            // idem
+        }
+
+        ConsultaOutPutDTO dto = new ConsultaOutPutDTO();
+        dto.setId(c.getId());
+        dto.setDateTime(c.getDateTime());
+        dto.setDuration(c.getDuration());
+        dto.setConsultationType(c.getConsultationType());
+        dto.setStatus(c.getStatus());
+        dto.setNotes(c.getNotes());
+
+        dto.setPatientId(c.getPatientId());
+        dto.setPhysicianId(c.getPhysicianId());
+
+        if (patient != null) {
+            dto.setPatientName(patient.getFullName());
+        }
+        if (physician != null) {
+            dto.setPhysicianName(physician.getFullName());
+        }
         return dto;
     }
 }
