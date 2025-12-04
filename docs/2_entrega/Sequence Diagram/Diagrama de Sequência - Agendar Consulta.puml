@@ -1,72 +1,76 @@
 @startuml
-title Saga + CQRS: Paciente agenda consulta e vê lista de consultas
+title Saga + CQRS: Agendar Consulta (Coreografia Assíncrona)
 
-actor "Paciente" as PatientUI
-participant "API Gateway" as APIGW
+actor "Paciente" as User
+participant "API Gateway" as Gateway
 participant "Scheduling Command API" as SchedCmd
-database "Scheduling Write Postgresql" as WDB
-queue "Message Broker (AMQP)" as Broker
+database "Scheduling DB" as WDB
+queue "Message Broker" as Broker
 participant "Patient Service" as PatSvc
 participant "Physician Service" as DocSvc
-participant "Scheduling Query API (instância 1)" as SchedQ1
-database "Consultations Read Postgresql #1" as RDB1
+participant "Scheduling Query API" as SchedQuery
+database "Consultations Read DB" as RDB
 
-== Comando: agendar consulta ==
+autonumber
 
-PatientUI -> APIGW : POST /consultations\n(patientId, physicianId, dateTime, ...)
-APIGW -> SchedCmd : POST /consultations\n(patientId, physicianId, dateTime, ...)
+== 1. Início do Agendamento (Comando) ==
+
+User -> Gateway : POST /appointments\n{patientId, physicianId, time}
+Gateway -> SchedCmd : POST /appointments
 
 activate SchedCmd
-SchedCmd -> WDB : INSERT Consultation\n(status = PENDING)
-WDB --> SchedCmd : OK
 
-SchedCmd -> Broker : publish ConsultationSchedulingStarted
+    SchedCmd -> WDB : INSERT Appointment (status = PENDING)
+    WDB --> SchedCmd : OK (Retorna ID gerado)
+
+    SchedCmd -> Broker : publish **AppointmentCreatedEvent**\n{apptId, patientId, physicianId...}
+
+    SchedCmd --> Gateway : 202 Accepted
 deactivate SchedCmd
 
-== Saga: validação de paciente e médico ==
+Gateway --> User : 202 Accepted\n"A processar agendamento..."
 
-Broker -> PatSvc : ConsultationSchedulingStarted
-activate PatSvc
-PatSvc -> PatSvc : validar patientId
-PatSvc -> Broker : publish PatientValidatedForConsultation
-deactivate PatSvc
+== 2. Saga: Validações Paralelas (Coreografia) ==
 
-Broker -> DocSvc : ConsultationSchedulingStarted
-activate DocSvc
-DocSvc -> DocSvc : validar physicianId & disponibilidade
-DocSvc -> Broker : publish PhysicianAvailabilityConfirmed
-deactivate DocSvc
+group Validação de Paciente
+    activate PatSvc
+    Broker -> PatSvc : consume **AppointmentCreatedEvent**
+    PatSvc -> PatSvc : Validar existência/dívidas
+    PatSvc -> Broker : publish **PatientValidatedEvent**\n{apptId, valid: true}
+    deactivate PatSvc
+end
 
-== Orquestrador reage aos eventos ==
+group Validação de Médico
+    activate DocSvc
+    Broker -> DocSvc : consume **AppointmentCreatedEvent**
+    DocSvc -> DocSvc : Validar disponibilidade
+    DocSvc -> Broker : publish **PhysicianAvailabilityConfirmedEvent**\n{apptId, valid: true}
+    deactivate DocSvc
+end
 
-Broker -> SchedCmd : PatientValidatedForConsultation
-Broker -> SchedCmd : PhysicianAvailabilityConfirmed
+== 3. Conclusão da Saga ==
+
 activate SchedCmd
-SchedCmd -> WDB : UPDATE Consultation\nstatus = CONFIRMED
-WDB --> SchedCmd : OK
+    Broker -> SchedCmd : consume **PatientValidatedEvent**
+    Broker -> SchedCmd : consume **PhysicianAvailabilityConfirmedEvent**
 
-SchedCmd -> Broker : publish ConsultationScheduled
+    note right of SchedCmd
+      O serviço aguarda a chegada
+      de ambos os eventos de sucesso
+      para confirmar a consulta.
+    end note
+
+    SchedCmd -> WDB : UPDATE Appointment SET status = CONFIRMED
+
+    SchedCmd -> Broker : publish **AppointmentBookedEvent**\n{Full Appointment Data}
 deactivate SchedCmd
 
-== Atualização dos read models (CQRS) ==
+== 4. Atualização de Leitura (CQRS) ==
 
-Broker -> SchedQ1 : ConsultationScheduled
-activate SchedQ1
-SchedQ1 -> RDB1 : UPSERT consulta\npara read model do paciente
-RDB1 --> SchedQ1 : OK
-deactivate SchedQ1
-
-== Query: paciente vê as consultas ==
-
-PatientUI -> APIGW : GET /consultations?patientId=...
-APIGW -> SchedQ1 : GET /consultations?patientId=...
-
-activate SchedQ1
-SchedQ1 -> RDB1 : SELECT consultas\nWHERE patientId=...
-RDB1 --> SchedQ1 : lista de consultas
-SchedQ1 --> APIGW : 200 OK\nlista de consultas
-deactivate SchedQ1
-
-APIGW --> PatientUI : 200 OK\nlista de consultas futuras
+activate SchedQuery
+    Broker -> SchedQuery : consume **AppointmentBookedEvent**
+    SchedQuery -> RDB : INSERT/UPDATE AppointmentView
+    RDB --> SchedQuery : OK
+deactivate SchedQuery
 
 @enduml

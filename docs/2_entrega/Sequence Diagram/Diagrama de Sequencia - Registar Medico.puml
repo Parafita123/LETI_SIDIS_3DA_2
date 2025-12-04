@@ -1,7 +1,7 @@
 @startuml
-title Saga + CQRS: Registo de Paciente
+title Saga + CQRS: Registo de Médico (Assíncrono)
 
-actor "Admin" as User
+actor "Admin" as Admin
 participant "API Gateway" as Gateway
 participant "Physician Command API" as PhyCmd
 database "Physician Write DB\n(H2)" as WDB
@@ -10,55 +10,49 @@ participant "Identity Service" as IdentitySvc
 participant "Physician Query API" as PhyQuery
 database "Physician Read DB\n(H2)" as RDB
 
-== Comando: Registar Medico ==
+autonumber
 
-User -> Gateway : POST /physician\n(nome, email, ...)
-Gateway -> PhyCmd : POST /physician\n(nome, email, ...)
+== 1. Início do Comando ==
+
+Admin -> Gateway : POST /physicians\n(nome, especialidade, licenca...)
+Gateway -> PhyCmd : POST /physicians
 
 activate PhyCmd
-PhyCmd -> WDB : INSERT Physician\n(status = PENDING_VALIDATION)
-WDB --> PhyCmd : OK
 
-PhyCmd -> Broker : publish PhysicianRegistrationStarted
+    PhyCmd -> WDB : INSERT Physician (status = PENDING_ID)
+    WDB --> PhyCmd : OK (Retorna ID gerado)
+
+    PhyCmd -> Broker : publish **PhysicianRegistrationStarted**\n(physicianId, email, ...)
+
+    PhyCmd --> Gateway : 202 Accepted
 deactivate PhyCmd
 
-== Saga: Validação e Criação de Identidade ==
+Gateway --> Admin : 202 Accepted
 
-Broker -> IdentitySvc : PhysicianRegistrationStarted
+== 2. Saga: Criação de Credenciais de Médico ==
+
 activate IdentitySvc
-IdentitySvc -> IdentitySvc : Validar e criar\ncredenciais de acesso
-IdentitySvc -> Broker : publish PhysicianIdentityCreated
+    Broker -> IdentitySvc : consume **PhysicianRegistrationStarted**
+    IdentitySvc -> IdentitySvc : Criar User (Role: DOCTOR)
+    IdentitySvc -> Broker : publish **PhysicianIdentityCreated**\n(physicianId, authId)
 deactivate IdentitySvc
 
-== Orquestrador (Command) finaliza o Registo ==
+== 3. Consolidação do Médico ==
 
-Broker -> PhyCmd : PhysicianIdentityCreated
 activate PhyCmd
-PhyCmd -> WDB : UPDATE Physician\nstatus = ACTIVE
-WDB --> PhyCmd : OK
+    Broker -> PhyCmd : consume **PhysicianIdentityCreated**
+    PhyCmd -> WDB : UPDATE Physician SET status = ACTIVE
+    WDB --> PhyCmd : OK
 
-PhyCmd -> Broker : publish PhysicianRegistered
+    PhyCmd -> Broker : publish **PhysicianRegistered**
 deactivate PhyCmd
 
-== Atualização dos Read Models (CQRS) ==
-
-Broker -> PhyQuery : PatientRegistered
-activate PhyQuery
-PhyQuery -> RDB : UPSERT PhysicianView\n(Dados otimizados para leitura)
-RDB --> PhyQuery : OK
-deactivate PhyQuery
-
-== Query: Visualizar Detalhes do Physician ==
-
-User -> Gateway : GET /physicians/{id}
-Gateway -> PhyQuery : GET /physicians/{id}
+== 4. Sincronização de Leitura (CQRS) ==
 
 activate PhyQuery
-PhyQuery -> RDB : SELECT * FROM PhysicianView\nWHERE id = ...
-RDB --> PhyQuery : JSON do Physician
-PhyQuery --> Gateway : 200 OK\nDTO do Physician
+    Broker -> PhyQuery : consume **PhysicianRegistered**
+    PhyQuery -> RDB : UPSERT PhysicianView
+    RDB --> PhyQuery : OK
 deactivate PhyQuery
-
-Gateway --> User : 200 OK\nExibe dados do medico
 
 @enduml

@@ -1,64 +1,58 @@
 @startuml
-title Saga + CQRS: Registo de Paciente
+title Saga + CQRS: Registo de Paciente (Assíncrono)
 
-actor "Utilizador Autenticado" as User
+actor "Utilizador\n(Recepcionista/Paciente)" as User
 participant "API Gateway" as Gateway
 participant "Patient Command API" as PatCmd
-database "Patient Write DB\n(H2)" as WDB
+database "Patient Write DB\n(PostgreSQL)" as WDB
 queue "Message Broker\n(RabbitMQ)" as Broker
 participant "Identity Service" as IdentitySvc
 participant "Patient Query API" as PatQuery
-database "Patient Read DB\n(H2)" as RDB
+database "Patient Read DB\n(MongoDB)" as RDB
 
-== Comando: Registar Paciente ==
+autonumber
 
-User -> Gateway : POST /patients\n(nome, email, nif, ...)
-Gateway -> PatCmd : POST /patients\n(nome, email, nif, ...)
+== 1. Início do Comando (Escrita) ==
+
+User -> Gateway : POST /patients\n{nome, email, nif...}
+Gateway -> PatCmd : POST /patients
 
 activate PatCmd
-PatCmd -> WDB : INSERT Patient\n(status = PENDING_VALIDATION)
-WDB --> PatCmd : OK
 
-PatCmd -> Broker : publish PatientRegistrationStarted
+    PatCmd -> WDB : INSERT Patient (status = PENDING)
+    WDB --> PatCmd : OK (Retorna ID gerado)
+
+    PatCmd -> Broker : publish **PatientRegistrationStarted**\n{patientId, email...}
+
+    PatCmd --> Gateway : 202 Accepted (Processamento em curso)
 deactivate PatCmd
 
-== Saga: Validação e Criação de Identidade ==
+Gateway --> User : 202 Accepted\n"Registo iniciado, verifique o email."
 
-Broker -> IdentitySvc : PatientRegistrationStarted
+== 2. Saga: Criação de Identidade ==
+
 activate IdentitySvc
-IdentitySvc -> IdentitySvc : Validar e criar\ncredenciais de acesso
-IdentitySvc -> Broker : publish PatientIdentityCreated
+    Broker -> IdentitySvc : consume **PatientRegistrationStarted**
+    IdentitySvc -> IdentitySvc : Criar Utilizador Auth (Keycloak/Auth0)
+    IdentitySvc -> Broker : publish **PatientIdentityCreated**\n{patientId, authId}
 deactivate IdentitySvc
 
-== Orquestrador (Command) finaliza o Registo ==
+== 3. Finalização do Comando ==
 
-Broker -> PatCmd : PatientIdentityCreated
 activate PatCmd
-PatCmd -> WDB : UPDATE Patient\nstatus = ACTIVE
-WDB --> PatCmd : OK
+    Broker -> PatCmd : consume **PatientIdentityCreated**
+    PatCmd -> WDB : UPDATE Patient SET status = ACTIVE, authId = ...
+    WDB --> PatCmd : OK
 
-PatCmd -> Broker : publish PatientRegistered
+    PatCmd -> Broker : publish **PatientRegistered**\n{Full Patient Data}
 deactivate PatCmd
 
-== Atualização dos Read Models (CQRS) ==
-
-Broker -> PatQuery : PatientRegistered
-activate PatQuery
-PatQuery -> RDB : UPSERT PatientView\n(Dados otimizados para leitura)
-RDB --> PatQuery : OK
-deactivate PatQuery
-
-== Query: Visualizar Detalhes do Paciente ==
-
-User -> Gateway : GET /patients/{id}
-Gateway -> PatQuery : GET /patients/{id}
+== 4. Atualização do Modelo de Leitura (CQRS) ==
 
 activate PatQuery
-PatQuery -> RDB : SELECT * FROM PatientView\nWHERE id = ...
-RDB --> PatQuery : JSON do Paciente
-PatQuery --> Gateway : 200 OK\nDTO do Paciente
+    Broker -> PatQuery : consume **PatientRegistered**
+    PatQuery -> RDB : UPSERT PatientView (Dados desnormalizados)
+    RDB --> PatQuery : OK
 deactivate PatQuery
-
-Gateway --> User : 200 OK\nExibe dados do paciente
 
 @enduml
