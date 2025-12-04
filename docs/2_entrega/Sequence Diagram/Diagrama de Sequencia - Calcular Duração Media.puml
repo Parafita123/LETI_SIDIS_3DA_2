@@ -23,10 +23,6 @@ end note
     Gateway -> QueryAPI : GET /stats/average-duration
 
     activate QueryAPI
-        note right of QueryAPI
-          Query otimizada à base de dados de leitura.
-          Os dados já estão pré-processados ou indexados.
-        end note
 
         QueryAPI -> RDB : aggregate(...)
 
