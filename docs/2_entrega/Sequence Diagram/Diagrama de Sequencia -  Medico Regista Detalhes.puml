@@ -1,0 +1,53 @@
+@startuml
+title Saga + CQRS: Registar Detalhes da Consulta (Assíncrono)
+
+actor "Médico" as User
+participant "API Gateway" as Gateway
+participant "ClinicalRecord Command API" as RecordCmd
+database "ClinicalRecord Write DB\n(H2)" as WDB
+queue "Message Broker\n(RabbitMQ)" as Broker
+participant "ClinicalRecord Query API" as RecordQuery
+database "ClinicalRecord Read DB\n(H2)" as RDB
+
+autonumber
+
+note right of User
+  **Pré-condição:**
+  O Médico possui Token JWT
+  com a claim: **physicianId**
+end note
+
+== Registo dos Detalhes (Comando) ==
+
+User -> Gateway : POST /appointment-records/{apptId}/details\n(diagnóstico, receita...)
+
+Gateway -> Gateway : Valida Token e extrai **physicianId**
+
+Gateway -> RecordCmd : POST /appointment-records/{apptId}/details\n(Header: X-Physician-ID: ...)
+
+activate RecordCmd
+
+    RecordCmd -> WDB : SELECT Record FROM appointment_records WHERE id = apptId
+    WDB --> RecordCmd : Retorna registo (com ownerId)
+
+    RecordCmd -> RecordCmd : Valida se physicianId == ownerId
+
+    RecordCmd -> WDB : INSERT AppointmentDetails (...)
+    WDB --> RecordCmd : OK
+
+    RecordCmd -> Broker : publish **AppointmentDetailsRecorded**\n{apptId, physicianId, timestamp...}
+
+    RecordCmd --> Gateway : 202 Accepted
+deactivate RecordCmd
+
+Gateway --> User : 202 Accepted\n"Detalhes guardados com sucesso."
+
+== Sincronização de Leitura (CQRS) ==
+
+activate RecordQuery
+    Broker -> RecordQuery : consume **AppointmentDetailsRecorded**
+    RecordQuery -> RDB : UPSERT AppointmentRecordView\n(Adiciona detalhes ao documento)
+    RDB --> RecordQuery : OK
+deactivate RecordQuery
+
+@enduml

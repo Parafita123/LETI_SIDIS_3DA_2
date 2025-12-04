@@ -1,0 +1,88 @@
+@startuml
+title Saga + CQRS: Atualizar ou Cancelar Consulta (Assíncrono)
+
+actor "Paciente/Admin" as User
+participant "API Gateway" as Gateway
+participant "Scheduling Command API" as SchedCmd
+database "Scheduling Write DB" as WDB
+queue "Message Broker" as Broker
+participant "Physician Service" as DocSvc
+participant "Scheduling Query API" as SchedQuery
+database "Scheduling Read DB" as RDB
+
+autonumber
+
+group Fase 1: Atualizar/Reagendar Consulta (Saga)
+
+    User -> Gateway : PUT /appointments/{id}\n{newDateTime, ...}
+
+    Gateway -> Gateway : Valida Token (JWT)\ne extrai UserID/Role
+
+    Gateway -> SchedCmd : PUT /appointments/{id}
+
+    activate SchedCmd
+
+        SchedCmd -> WDB : SELECT Appointment
+        WDB --> SchedCmd : Retorna dados
+        SchedCmd -> SchedCmd : Valida se User é dono ou Admin
+
+        SchedCmd -> WDB : UPDATE Status = PENDING_RESCHEDULE
+        WDB --> SchedCmd : OK
+
+        SchedCmd -> Broker : publish **AppointmentRescheduleStarted**\n{apptId, newTime, doctorId...}
+
+        SchedCmd --> Gateway : 202 Accepted
+    deactivate SchedCmd
+
+    Gateway --> User : 202 Accepted\n"Pedido de alteração recebido."
+
+    activate DocSvc
+        Broker -> DocSvc : consume **AppointmentRescheduleStarted**
+        DocSvc -> DocSvc : Verifica disponibilidade\ndo novo horário
+        DocSvc -> Broker : publish **PhysicianAvailabilityConfirmed**\n{apptId, valid: true}
+    deactivate DocSvc
+
+    activate SchedCmd
+        Broker -> SchedCmd : consume **PhysicianAvailabilityConfirmed**
+        SchedCmd -> WDB : UPDATE Appointment\nSET date = newDate, status = CONFIRMED
+
+        SchedCmd -> Broker : publish **AppointmentUpdated**
+    deactivate SchedCmd
+
+    activate SchedQuery
+        Broker -> SchedQuery : consume **AppointmentUpdated**
+        SchedQuery -> RDB : UPDATE AppointmentView
+        RDB --> SchedQuery : OK
+    deactivate SchedQuery
+
+end
+
+group Fase 2: Cancelar Consulta (Event-Driven)
+
+    User -> Gateway : DELETE /appointments/{id}
+    Gateway -> SchedCmd : DELETE /appointments/{id}
+
+    activate SchedCmd
+
+        SchedCmd -> WDB : SELECT Appointment
+        SchedCmd -> SchedCmd : Valida permissões (User vs Owner)
+
+        SchedCmd -> WDB : UPDATE Status = CANCELLED
+        WDB --> SchedCmd : OK
+
+        SchedCmd -> Broker : publish **AppointmentCancelled**\n{apptId, reason...}
+
+        SchedCmd --> Gateway : 202 Accepted
+    deactivate SchedCmd
+
+    Gateway --> User : 202 Accepted\n"Consulta a ser cancelada."
+
+    activate SchedQuery
+        Broker -> SchedQuery : consume **AppointmentCancelled**
+        SchedQuery -> RDB : DELETE / UPDATE AppointmentView
+        RDB --> SchedQuery : OK
+    deactivate SchedQuery
+
+
+end
+@enduml

@@ -1,0 +1,28 @@
+@startuml
+title CQRS (Query Side): Ver Detalhes do Paciente (Médico)
+
+actor "Médico" as User
+participant "API Gateway" as Gateway
+participant "Patient Query API" as QueryAPI
+database "Patient Read DB\n(H2)" as RDB
+
+autonumber
+
+User -> Gateway : GET /patients/{patientId}\n(Authorization: Bearer <JWT>)
+
+Gateway -> Gateway : Valida Assinatura JWT
+Gateway -> Gateway : Extrai **physician_id** do Token
+
+Gateway -> QueryAPI : GET /patients/{patientId}\n(Header X-Physician-ID: ...)
+
+activate QueryAPI
+    QueryAPI -> RDB : findOne({ \n  _id: {patientId}, \n  relatedPhysicianIds: {physician_id} \n})
+
+    RDB --> QueryAPI : Documento do Paciente
+
+    QueryAPI --> Gateway : 200 OK + DTO Detalhes
+deactivate QueryAPI
+
+Gateway --> User : 200 OK + JSON
+
+@enduml
