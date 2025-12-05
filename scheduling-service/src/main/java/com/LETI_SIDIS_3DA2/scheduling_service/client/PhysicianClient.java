@@ -1,6 +1,6 @@
 package com.LETI_SIDIS_3DA2.scheduling_service.client;
 
-import com.LETI_SIDIS_3DA2.scheduling_service.dto.PhysicianDetailsDTO;
+import com.LETI_SIDIS_3DA2.scheduling_service.query.dto.PhysicianDetailsDTO;
 import com.LETI_SIDIS_3DA2.scheduling_service.exception.ResourceNotFoundException;
 import com.LETI_SIDIS_3DA2.scheduling_service.exception.ServiceUnavailableException;
 import org.springframework.beans.factory.annotation.Value;

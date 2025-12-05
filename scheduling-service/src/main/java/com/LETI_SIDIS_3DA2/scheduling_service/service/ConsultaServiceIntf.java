@@ -1,6 +1,10 @@
 package com.LETI_SIDIS_3DA2.scheduling_service.service;
 
-import com.LETI_SIDIS_3DA2.scheduling_service.dto.*;
+import com.LETI_SIDIS_3DA2.scheduling_service.command.dto.ConsultaInputDTO;
+import com.LETI_SIDIS_3DA2.scheduling_service.command.dto.UpdateConsultaDTO;
+import com.LETI_SIDIS_3DA2.scheduling_service.query.dto.AgeGroupStatsDto;
+import com.LETI_SIDIS_3DA2.scheduling_service.query.dto.ConsultaOutPutDTO;
+
 import java.util.List;
 import java.util.Map;
 

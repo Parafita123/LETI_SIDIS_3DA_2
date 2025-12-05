@@ -1,4 +1,4 @@
-package  com.LETI_SIDIS_3DA2.scheduling_service.dto;
+package com.LETI_SIDIS_3DA2.scheduling_service.query.dto;
 import java.time.LocalTime;
 // Este DTO representa os dados que recebemos do Physician Service.
 // Os nomes dos campos devem corresponder aos do JSON retornado pelo Physician Service.

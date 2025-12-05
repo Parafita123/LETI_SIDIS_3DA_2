@@ -1,4 +1,4 @@
-package com.LETI_SIDIS_3DA2.scheduling_service.dto;
+package com.LETI_SIDIS_3DA2.scheduling_service.query.dto;
 
 public class AgeGroupStatsDto {
     private String ageGroup;
