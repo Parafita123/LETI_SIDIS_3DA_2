@@ -1,7 +1,7 @@
 @startuml
 title Saga + CQRS: Registo de Paciente (Assíncrono)
 
-actor "Utilizador\n(Recepcionista/Paciente)" as User
+actor "Utilizador\n(Recepcionista)" as User
 participant "API Gateway" as Gateway
 participant "Patient Command API" as PatCmd
 database "Patient Write DB\n(PostgreSQL)" as WDB
@@ -11,6 +11,12 @@ participant "Patient Query API" as PatQuery
 database "Patient Read DB\n(MongoDB)" as RDB
 
 autonumber
+
+note right of User
+  **Pré-condição:**
+  O Utilizador (ex: Recepcionista)
+  já está autenticado e possui Token.
+end note
 
 == 1. Início do Comando (Escrita) ==
 

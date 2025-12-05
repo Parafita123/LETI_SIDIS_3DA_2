@@ -8,15 +8,22 @@ database "Patient Read DB\n(H2)" as RDB
 
 autonumber
 
+note right of User
+  **Pré-condição:**
+  O Médico já está autenticado
+  e possui um Token JWT.
+end note
+
 User -> Gateway : GET /patients/{patientId}\n(Authorization: Bearer <JWT>)
 
 Gateway -> Gateway : Valida Assinatura JWT
-Gateway -> Gateway : Extrai **physician_id** do Token
+Gateway -> Gateway : Extrai **physicianId** do Token
 
-Gateway -> QueryAPI : GET /patients/{patientId}\n(Header X-Physician-ID: ...)
+Gateway -> QueryAPI : GET /patients/{patientId}\n(Header X-Physician-ID: {physicianId})
 
 activate QueryAPI
-    QueryAPI -> RDB : findOne({ \n  _id: {patientId}, \n  relatedPhysicianIds: {physician_id} \n})
+
+    QueryAPI -> RDB : findOne({ \n  _id: {patientId}, \n  relatedPhysicianIds: {physicianId} \n})
 
     RDB --> QueryAPI : Documento do Paciente
 

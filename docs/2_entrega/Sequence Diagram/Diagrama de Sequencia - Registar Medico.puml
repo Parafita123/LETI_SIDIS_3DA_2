@@ -12,6 +12,12 @@ database "Physician Read DB\n(H2)" as RDB
 
 autonumber
 
+note right of Admin
+  **Pré-condição:**
+  O Administrador já está autenticado
+  e possui um Token JWT (Role: ADMIN).
+end note
+
 == 1. Início do Comando ==
 
 Admin -> Gateway : POST /physicians\n(nome, especialidade, licenca...)

@@ -12,7 +12,13 @@ database "Scheduling Read DB" as RDB
 
 autonumber
 
-group Fase 1: Atualizar/Reagendar Consulta (Saga)
+note right of User
+  **Pré-condição:**
+  O Utilizador já está autenticado
+  e possui um Token JWT.
+end note
+
+group Cenário A: Atualizar/Reagendar Consulta (Saga)
 
     User -> Gateway : PUT /appointments/{id}\n{newDateTime, ...}
 
@@ -57,7 +63,7 @@ group Fase 1: Atualizar/Reagendar Consulta (Saga)
 
 end
 
-group Fase 2: Cancelar Consulta (Event-Driven)
+group Cenário B: Cancelar Consulta (Event-Driven)
 
     User -> Gateway : DELETE /appointments/{id}
     Gateway -> SchedCmd : DELETE /appointments/{id}
@@ -82,7 +88,6 @@ group Fase 2: Cancelar Consulta (Event-Driven)
         SchedQuery -> RDB : DELETE / UPDATE AppointmentView
         RDB --> SchedQuery : OK
     deactivate SchedQuery
-
 
 end
 @enduml

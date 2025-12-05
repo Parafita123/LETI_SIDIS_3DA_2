@@ -1,0 +1,38 @@
+@startuml
+title CQRS (Query Side): Relatório Mensal de Consultas
+
+actor "Administrador" as Admin
+participant "API Gateway" as Gateway
+participant "Scheduling Query API" as QueryAPI
+database "Scheduling Read DB\n(H2)" as RDB
+
+autonumber
+
+note right of Admin
+  **Pré-condição:**
+  O Administrador já está autenticado
+  e possui um Token JWT (Role: ADMIN).
+end note
+
+== Obtenção do Relatório (Leitura) ==
+
+Admin -> Gateway : GET /stats/monthly-report?year={y}&month={m}\n(Authorization: Bearer <JWT>)
+
+Gateway -> Gateway : Valida Token e Permissões (ADMIN)
+
+Gateway -> QueryAPI : GET /stats/monthly-report?year={y}&month={m}
+
+activate QueryAPI
+
+    QueryAPI -> RDB : aggregate([\n  { $match: { year: {y}, month: {m} } },\n  { $group: { _id: "$status", count: { $sum: 1 } } }\n])
+
+    RDB --> QueryAPI : Retorna Totais Agrupados (JSON)
+
+    QueryAPI -> QueryAPI : Mapeia para ConsultasReportDTO
+
+    QueryAPI --> Gateway : 200 OK + ConsultasReportDTO
+deactivate QueryAPI
+
+Gateway --> Admin : 200 OK + JSON (Relatório Visual)
+
+@enduml
