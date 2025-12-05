@@ -1,0 +1,64 @@
+@startuml
+title Saga + CQRS: Registo de Médico (Assíncrono)
+
+actor "Admin" as Admin
+participant "API Gateway" as Gateway
+participant "Physician Command API" as PhyCmd
+database "Physician Write DB\n(H2)" as WDB
+queue "Message Broker\n(RabbitMQ)" as Broker
+participant "Identity Service" as IdentitySvc
+participant "Physician Query API" as PhyQuery
+database "Physician Read DB\n(H2)" as RDB
+
+autonumber
+
+note right of Admin
+  **Pré-condição:**
+  O Administrador já está autenticado
+  e possui um Token JWT (Role: ADMIN).
+end note
+
+== 1. Início do Comando ==
+
+Admin -> Gateway : POST /physicians\n(nome, especialidade, licenca...)
+Gateway -> PhyCmd : POST /physicians
+
+activate PhyCmd
+
+    PhyCmd -> WDB : INSERT Physician (status = PENDING_ID)
+    WDB --> PhyCmd : OK (Retorna ID gerado)
+
+    PhyCmd -> Broker : publish **PhysicianRegistrationStarted**\n(physicianId, email, ...)
+
+    PhyCmd --> Gateway : 202 Accepted
+deactivate PhyCmd
+
+Gateway --> Admin : 202 Accepted
+
+== 2. Saga: Criação de Credenciais de Médico ==
+
+activate IdentitySvc
+    Broker -> IdentitySvc : consume **PhysicianRegistrationStarted**
+    IdentitySvc -> IdentitySvc : Criar User (Role: DOCTOR)
+    IdentitySvc -> Broker : publish **PhysicianIdentityCreated**\n(physicianId, authId)
+deactivate IdentitySvc
+
+== 3. Consolidação do Médico ==
+
+activate PhyCmd
+    Broker -> PhyCmd : consume **PhysicianIdentityCreated**
+    PhyCmd -> WDB : UPDATE Physician SET status = ACTIVE
+    WDB --> PhyCmd : OK
+
+    PhyCmd -> Broker : publish **PhysicianRegistered**
+deactivate PhyCmd
+
+== 4. Sincronização de Leitura (CQRS) ==
+
+activate PhyQuery
+    Broker -> PhyQuery : consume **PhysicianRegistered**
+    PhyQuery -> RDB : UPSERT PhysicianView
+    RDB --> PhyQuery : OK
+deactivate PhyQuery
+
+@enduml

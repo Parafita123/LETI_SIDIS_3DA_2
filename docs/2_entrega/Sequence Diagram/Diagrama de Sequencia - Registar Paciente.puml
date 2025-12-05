@@ -1,0 +1,64 @@
+@startuml
+title Saga + CQRS: Registo de Paciente (Assíncrono)
+
+actor "Utilizador\n(Recepcionista)" as User
+participant "API Gateway" as Gateway
+participant "Patient Command API" as PatCmd
+database "Patient Write DB\n(PostgreSQL)" as WDB
+queue "Message Broker\n(RabbitMQ)" as Broker
+participant "Identity Service" as IdentitySvc
+participant "Patient Query API" as PatQuery
+database "Patient Read DB\n(MongoDB)" as RDB
+
+autonumber
+
+note right of User
+  **Pré-condição:**
+  O Utilizador (ex: Recepcionista)
+  já está autenticado e possui Token.
+end note
+
+== 1. Início do Comando (Escrita) ==
+
+User -> Gateway : POST /patients\n{nome, email, nif...}
+Gateway -> PatCmd : POST /patients
+
+activate PatCmd
+
+    PatCmd -> WDB : INSERT Patient (status = PENDING)
+    WDB --> PatCmd : OK (Retorna ID gerado)
+
+    PatCmd -> Broker : publish **PatientRegistrationStarted**\n{patientId, email...}
+
+    PatCmd --> Gateway : 202 Accepted (Processamento em curso)
+deactivate PatCmd
+
+Gateway --> User : 202 Accepted\n"Registo iniciado, verifique o email."
+
+== 2. Saga: Criação de Identidade ==
+
+activate IdentitySvc
+    Broker -> IdentitySvc : consume **PatientRegistrationStarted**
+    IdentitySvc -> IdentitySvc : Criar Utilizador Auth (Keycloak/Auth0)
+    IdentitySvc -> Broker : publish **PatientIdentityCreated**\n{patientId, authId}
+deactivate IdentitySvc
+
+== 3. Finalização do Comando ==
+
+activate PatCmd
+    Broker -> PatCmd : consume **PatientIdentityCreated**
+    PatCmd -> WDB : UPDATE Patient SET status = ACTIVE, authId = ...
+    WDB --> PatCmd : OK
+
+    PatCmd -> Broker : publish **PatientRegistered**\n{Full Patient Data}
+deactivate PatCmd
+
+== 4. Atualização do Modelo de Leitura (CQRS) ==
+
+activate PatQuery
+    Broker -> PatQuery : consume **PatientRegistered**
+    PatQuery -> RDB : UPSERT PatientView (Dados desnormalizados)
+    RDB --> PatQuery : OK
+deactivate PatQuery
+
+@enduml

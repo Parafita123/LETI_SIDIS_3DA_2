@@ -1,0 +1,52 @@
+Aqui está a versão atualizada, sem os valores específicos (como "doc-123"), usando apenas nomes de variáveis genéricas.
+
+Continua a ser Síncrono (porque é uma Leitura/Query) e Não-Coreografado (vai direto à BD).
+
+code
+Plantuml
+download
+content_copy
+expand_less
+@startuml
+title CQRS (Query Side): Ver Detalhes do Paciente (Médico)
+
+actor "Médico" as User
+participant "API Gateway" as Gateway
+participant "Patient Query API" as QueryAPI
+database "Patient Read DB\n(H2)" as RDB
+
+autonumber
+
+note right of User
+  **Pré-condição:**
+  O Médico já está autenticado
+  e o Token JWT contém a claim:
+  **physicianId**
+end note
+
+== Obtenção dos Detalhes (Leitura) ==
+
+User -> Gateway : GET /patients/{patientId}\n(Authorization: Bearer <JWT>)
+
+Gateway -> Gateway : Valida Token
+Gateway -> Gateway : Extrai **physicianId** do payload
+
+Gateway -> QueryAPI : GET /patients/{patientId}\n(Header X-Physician-ID: {physicianId})
+
+activate QueryAPI
+
+    QueryAPI -> RDB : findOne({ \n  _id: patientId, \n  relatedPhysicianIds: {physicianId} \n})
+
+    alt Paciente encontrado e relação validada
+        RDB --> QueryAPI : Documento JSON do Paciente
+        QueryAPI -> QueryAPI : Mapeia para DTO
+        QueryAPI --> Gateway : 200 OK + PatientDto
+        Gateway --> User : 200 OK + JSON
+    else Paciente não existe ou Médico não autorizado
+        RDB --> QueryAPI : null
+        QueryAPI --> Gateway : 404 Not Found (ou 403)
+        Gateway --> User : 404 Not Found
+    end
+deactivate QueryAPI
+
+@enduml

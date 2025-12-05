@@ -1,0 +1,38 @@
+@startuml
+title CQRS (Query Side): Estatísticas de Duração por Médico
+
+actor "Administrador" as Admin
+participant "API Gateway" as Gateway
+participant "Scheduling Query API" as QueryAPI
+database "Scheduling Read DB\n(H2)" as RDB
+
+autonumber
+
+note right of Admin
+  **Pré-condição:**
+  O Administrador já está autenticado
+  e possui um Token JWT (Role: ADMIN).
+end note
+
+== Obtenção da Estatística ==
+
+    Admin -> Gateway : GET /stats/average-duration\n(Authorization: Bearer <JWT>)
+
+    Gateway -> Gateway : Valida Token e Role (ADMIN)
+
+    Gateway -> QueryAPI : GET /stats/average-duration
+
+    activate QueryAPI
+
+        QueryAPI -> RDB : aggregate(...)
+
+        RDB --> QueryAPI : Retorna Lista de Médias
+
+        QueryAPI -> QueryAPI : Mapeia para DTO
+
+        QueryAPI --> Gateway : 200 OK + JSON
+    deactivate QueryAPI
+
+    Gateway --> Admin : 200 OK + JSON Tabela de Estatísticas
+
+@enduml

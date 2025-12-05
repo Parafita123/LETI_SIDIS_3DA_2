@@ -1,0 +1,40 @@
+@startuml
+title CQRS (Query Side): Pesquisa de Pacientes do Médico
+
+actor "Médico" as User
+participant "API Gateway" as Gateway
+participant "Patient Query API" as QueryAPI
+database "Patient Read DB\n(H2)" as RDB
+
+autonumber
+
+note right of User
+  **Pré-condição:**
+  O Médico já está autenticado
+  e o Token JWT contém a claim:
+  **physicianId**
+end note
+
+== Pesquisa Filtrada (Leitura) ==
+
+User -> Gateway : GET /patients?name={name}\n(Authorization: Bearer <JWT>)
+
+Gateway -> Gateway : Valida Token
+Gateway -> Gateway : Extrai **physicianId** do payload
+
+Gateway -> QueryAPI : GET /patients?name={name}\n(Header X-Physician-ID: {physicianId})
+
+activate QueryAPI
+
+    QueryAPI -> RDB : find({ \n  name: { $regex: {name} }, \n  relatedPhysicianIds: {physicianId} \n})
+
+    RDB --> QueryAPI : Lista de Documentos Encontrados
+
+    QueryAPI -> QueryAPI : Mapeia para Lista de DTOs
+
+    QueryAPI --> Gateway : 200 OK + List<PatientDto>
+deactivate QueryAPI
+
+Gateway --> User : 200 OK + JSON
+
+@enduml
