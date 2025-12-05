@@ -1,0 +1,152 @@
+
+services:
+  # =======================
+  # Identity Service
+  # =======================
+  identity-service-1:
+    build: ./identity-service
+    container_name: identity-service-1
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    ports:
+      - "8085:8085"
+
+
+  identity-service-2:
+    build: ./identity-service
+    container_name: identity-service-2
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    ports:
+      - "8091:8085"
+
+  # =======================
+  # Physician Service (2 instâncias)
+  # =======================
+  physician-service-1:
+    build: ./physician-service
+    container_name: physician-service-1
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    ports:
+      - "8081:8081"
+
+  physician-service-2:
+    build: ./physician-service
+    container_name: physician-service-2
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    ports:
+      - "8088:8081"   # mesma app, outra porta externa
+
+  # =======================
+  # Patient Service (2 instâncias)
+  # =======================
+  patient-service-1:
+    build: ./Patient-Service
+    container_name: patient-service-1
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    ports:
+      - "8083:8083"
+
+  patient-service-2:
+    build: ./Patient-Service
+    container_name: patient-service-2
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    ports:
+      - "8089:8083"
+
+  # =======================
+  # Clinical Records Service (1 instância)
+  # =======================
+  clinical-records-service-1:
+    build: ./clinical-records-service
+    container_name: clinical-records-service-1
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    ports:
+      - "8082:8082"
+
+  clinical-records-service-2:
+    build: ./clinical-records-service
+    container_name: clinical-records-service-2
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    ports:
+      - "8090:8082"
+
+  # =======================
+  # Scheduling DB (PostgreSQL)
+  # =======================
+  scheduling-db:
+    image: postgres:15
+    container_name: scheduling-db
+    environment:
+      POSTGRES_DB: scheduling_db
+      POSTGRES_USER: scheduling
+      POSTGRES_PASSWORD: scheduling
+    volumes:
+      - scheduling-data:/var/lib/postgresql/data
+    ports:
+      - "5434:5432"
+
+  # =======================
+  # Scheduling Service (2 instâncias)
+  # =======================
+  scheduling-service-1:
+    build: ./scheduling-service
+    container_name: scheduling-service-1
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    depends_on:
+      - scheduling-db
+      - physician-service-1
+      - patient-service-1
+    ports:
+      - "8084:8084"
+
+  scheduling-service-2:
+    build: ./scheduling-service
+    container_name: scheduling-service-2
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    depends_on:
+      - scheduling-db
+      - physician-service-1
+      - patient-service-1
+    ports:
+      - "8087:8084"
+
+  # =======================
+  # API Gateway
+  # =======================
+  api-gateway:
+    build: ./api-gateway
+    container_name: api-gateway
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    depends_on:
+      - identity-service-1
+      - physician-service-1
+      - patient-service-1
+      - clinical-records-service-1
+      - scheduling-service-1
+    ports:
+      - "8086:8086"
+
+
+volumes:
+  scheduling-data:

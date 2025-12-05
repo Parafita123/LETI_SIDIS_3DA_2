@@ -12,20 +12,16 @@ Este documento descreve a estratégia de **deployment distribuído** para a Part
 
 ---
 
-# 1. Arquitectura geral do deployment
+# 1. Estratégia de deployment
 
-A arquitetura final do sistema com múltiplas instâncias é:
-
-# 2. Estratégia de deployment
-
-## 2.1 Tecnologias recomendadas
+## 1.1 Tecnologias recomendadas
 
 - **Docker Compose** para desenvolvimento e entrega da UC.
 - Possível usar **Docker Swarm** para scaling automático, mas não é obrigatório.
 
 ---
 
-# 3. Estrutura dos ficheiros de configuração
+# 2. Estrutura dos ficheiros de configuração
 
  ``` deploy/
 ├── docker-compose.yml
@@ -53,7 +49,7 @@ Cada instância tem:
 
 ---
 
-# 4. Configuração por instância
+# 3. Configuração por instância
 
 Exemplo real para **Patient Service**:
 
@@ -105,7 +101,7 @@ rabbitmq:
 queue: patient-service.instance-2.events
 ```
 
-# 5. Docker Compose (multi-instância com read DB por instância)
+# 4. Docker Compose (multi-instância com read DB por instância)
 
 version: "3.9"
 
@@ -301,7 +297,7 @@ depends_on:
 - clinical-records-1
 - clinical-records-2
 
-# 6. Load Balancing (API Gateway)
+# 5. Load Balancing (API Gateway)
 
 O gateway deve ter:
 
@@ -318,7 +314,7 @@ Estratégias aceitáveis:
 
 Caso uma instância falhe > gateway redireciona automaticamente para as restantes.
 
-# 7. Arranque e shutdown
+# 6. Arranque e shutdown
 
 Ordem recomendada de arranque:
 
@@ -332,27 +328,27 @@ Ordem recomendada de arranque:
 - Cada instância deve terminar normalmente: o próximo arranque sincroniza com novos eventos e reconstrói o read model.
 
 
-# 8. Testes distribuídos obrigatórios
-## 8.1 Load balancing
+# 7. Testes distribuídos obrigatórios
+## 7.1 Load balancing
 
 Fazer 20 GET ao mesmo endpoint > verificar que respostas alternam entre instâncias.
 
-## 8.2 Eventos
+## 7.2 Eventos
 
 Criar uma consulta > verificar no RabbitMQ que:
 
 - O evento foi publicado
 - Ambas as instâncias consumiram
 
-## 8.3 Consistência eventual
+## 7.3 Consistência eventual
 
 Criar consulta e imediatamente fazer GET nas duas instâncias > pode haver atraso > esperado.
 
-## 8.4 Falha de instância
+## 7.4 Falha de instância
 
 Derrubar scheduling-service-1 > scheduling-service-2 continua funcional.
 
-## 8.5 Sagas
+## 7.5 Sagas
 
 Testar agendamento e cancelamento com:
 
@@ -362,7 +358,7 @@ Testar agendamento e cancelamento com:
 - Records inexistentes
 
 
-# 9. Resumo
+# 8. Resumo
 
 Este documento define:
 
@@ -371,4 +367,3 @@ Este documento define:
 - Ligação central ao RabbitMQ
 - Load balancing no API Gateway
 - Testes distribuídos essenciais
-- 
