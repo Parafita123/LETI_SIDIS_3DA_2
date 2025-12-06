@@ -1,5 +1,5 @@
 // Em ...clinicalrecordsservice.dto.client.AppointmentDetailsDTO.java
-package com.LETI_SIDIS_3DA_2.clinical_records_service.dto;
+package com.LETI_SIDIS_3DA_2.clinical_records_service.query.dto;
 
 // Este DTO representa os dados que recebemos do Scheduling Service.
 // Os campos devem corresponder aos do ConsultaOutPutDTO do outro serviço.

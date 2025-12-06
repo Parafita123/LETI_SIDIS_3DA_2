@@ -1,5 +1,5 @@
 // src/main/java/com/psoft2024/_5/grupo1/projeto_psoft/dto/PatientUpdateDto.java
-package com.LETI_SIDIS_3DA2.Patient_Service.dto;
+package com.LETI_SIDIS_3DA2.Patient_Service.command.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

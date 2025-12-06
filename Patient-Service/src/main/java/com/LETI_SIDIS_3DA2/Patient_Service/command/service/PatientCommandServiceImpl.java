@@ -1,22 +1,21 @@
-/*package com.LETI_SIDIS_3DA2.Patient_Service.service;
+package com.LETI_SIDIS_3DA2.Patient_Service.command.service;
 
-import com.LETI_SIDIS_3DA2.Patient_Service.domain.Patient;
 import com.LETI_SIDIS_3DA2.Patient_Service.command.dto.PatientCreateDto;
-import com.LETI_SIDIS_3DA2.Patient_Service.query.dto.PatientDto;
 import com.LETI_SIDIS_3DA2.Patient_Service.command.dto.PatientUpdateDto;
+import com.LETI_SIDIS_3DA2.Patient_Service.domain.Patient;
 import com.LETI_SIDIS_3DA2.Patient_Service.exception.ResourceNotFoundException;
+import com.LETI_SIDIS_3DA2.Patient_Service.query.dto.PatientDto;
 import com.LETI_SIDIS_3DA2.Patient_Service.repository.PatientRepository;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
-import java.util.stream.Collectors;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
-public class PatientServiceImpl implements PatientService {
+@Transactional
+public class PatientCommandServiceImpl implements PatientCommandService {
 
     private final PatientRepository repo;
 
-    public PatientServiceImpl(PatientRepository repo) {
+    public PatientCommandServiceImpl(PatientRepository repo) {
         this.repo = repo;
     }
 
@@ -24,11 +23,11 @@ public class PatientServiceImpl implements PatientService {
     public PatientDto register(PatientCreateDto in) {
         Patient p = new Patient();
 
-        // Preenche os campos originais obrigatórios (@NotBlank)
+        // campos originais
         p.setName(in.fullName);
         p.setBirthDate(in.birthDateLocal.toString());
 
-        // Preenche os novos campos do WP2A
+        // campos do WP2A
         p.setFullName(in.fullName);
         p.setEmail(in.email);
         p.setBirthDateLocal(in.birthDateLocal);
@@ -41,8 +40,6 @@ public class PatientServiceImpl implements PatientService {
 
         Patient saved = repo.save(p);
         return toDto(saved);
-
-
     }
 
     @Override
@@ -50,33 +47,16 @@ public class PatientServiceImpl implements PatientService {
         Patient p = repo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Paciente não encontrado"));
 
-        // Só os campos que o paciente pode alterar:
+        // só os campos alteráveis
         p.setEmail(in.email);
         p.setPhoneNumber(in.phoneNumber);
         p.setInsuranceCompany(in.insuranceCompany);
         p.setInsurancePolicyNumber(in.insurancePolicyNumber);
-        p.setPhotoUrl(in.photoUrl);               // se adicionaste esse campo
-        p.setHealthConcerns(in.healthConcerns);   // se adicionaste esse campo
-        // (Não toca em fullName, birthDateLocal, consentDate… a menos que queiras permitir)
+        p.setPhotoUrl(in.photoUrl);
+        p.setHealthConcerns(in.healthConcerns);
 
         Patient saved = repo.save(p);
         return toDto(saved);
-    }
-
-
-
-    @Override
-    public PatientDto findById(Long id) {
-        Patient p = repo.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Paciente não encontrado"));
-        return toDto(p);
-    }
-
-    @Override
-    public List<PatientDto> searchByName(String name) {
-        return repo.findByFullNameContainingIgnoreCase(name).stream()
-                .map(this::toDto)
-                .collect(Collectors.toList());
     }
 
     private PatientDto toDto(Patient p) {
@@ -94,4 +74,3 @@ public class PatientServiceImpl implements PatientService {
         return d;
     }
 }
- */

@@ -1,9 +1,10 @@
 package com.LETI_SIDIS_3DA2.Patient_Service.controller;
 
-import com.LETI_SIDIS_3DA2.Patient_Service.dto.PatientCreateDto;
-import com.LETI_SIDIS_3DA2.Patient_Service.dto.PatientDto;
-import com.LETI_SIDIS_3DA2.Patient_Service.dto.PatientUpdateDto;
-import com.LETI_SIDIS_3DA2.Patient_Service.service.PatientService;
+import com.LETI_SIDIS_3DA2.Patient_Service.command.dto.PatientCreateDto;
+import com.LETI_SIDIS_3DA2.Patient_Service.query.dto.PatientDto;
+import com.LETI_SIDIS_3DA2.Patient_Service.command.dto.PatientUpdateDto;
+import com.LETI_SIDIS_3DA2.Patient_Service.command.service.PatientCommandService;
+import com.LETI_SIDIS_3DA2.Patient_Service.query.service.PatientQueryService;
 import jakarta.validation.Valid;
 import org.springframework.hateoas.CollectionModel;
 import org.springframework.hateoas.EntityModel;
@@ -21,67 +22,39 @@ import static org.springframework.hateoas.server.mvc.WebMvcLinkBuilder.*;
 @RequestMapping("/api/patients")
 public class PatientController {
 
-    private final PatientService svc;
-    public PatientController(PatientService svc) {
-        this.svc = svc;
+    private final PatientCommandService commandService;
+    private final PatientQueryService queryService;
 
+    public PatientController(PatientCommandService commandService,
+                             PatientQueryService queryService) {
+        this.commandService = commandService;
+        this.queryService = queryService;
     }
 
+    // endpoint que CRIA paciente -> comando
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<EntityModel<PatientDto>> register(
-            @Valid @RequestBody PatientCreateDto in) {
-        PatientDto dto = svc.register(in);
-        EntityModel<PatientDto> model = EntityModel.of(dto,
-                linkTo(methodOn(PatientController.class).register(in)).withSelfRel(),
-                linkTo(methodOn(PatientController.class).getById(dto.getId())).withRel("patient"),
-                linkTo(methodOn(PatientController.class).search("")).withRel("patients")
-        );
-        return ResponseEntity
-                .created(model.getRequiredLink("self").toUri())
-                .body(model);
+    public ResponseEntity<PatientDto> register(@Valid @RequestBody PatientCreateDto in) {
+        PatientDto created = commandService.register(in);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
+
+    // endpoint que ATUALIZA paciente -> comando
+    @PutMapping("/{id}")
+    public ResponseEntity<PatientDto> update(@PathVariable Long id,
+                                             @Valid @RequestBody PatientUpdateDto in) {
+        PatientDto updated = commandService.update(id, in);
+        return ResponseEntity.ok(updated);
+    }
+
+    // endpoints só de LEITURA -> query
 
     @GetMapping("/{id}")
-    public EntityModel<PatientDto> getById(@PathVariable Long id) {
-        PatientDto dto = svc.findById(id);
-        return EntityModel.of(dto,
-                linkTo(methodOn(PatientController.class).getById(id)).withSelfRel(),
-                linkTo(methodOn(PatientController.class).search("")).withRel("patients")
-        );
+    public ResponseEntity<PatientDto> getById(@PathVariable Long id) {
+        return ResponseEntity.ok(queryService.findById(id));
     }
 
-    @PreAuthorize("hasRole('ADMIN') or hasRole('PATIENT')")
-    @PutMapping("/{id}")
-    public ResponseEntity<EntityModel<PatientDto>> update(
-            @PathVariable Long id,
-            @Valid @RequestBody PatientUpdateDto in
-    ) {
-        PatientDto updated = svc.update(id, in);
-        EntityModel<PatientDto> model = EntityModel.of(updated,
-                linkTo(methodOn(PatientController.class).getById(id)).withSelfRel(),
-                linkTo(methodOn(PatientController.class).search("")).withRel("patients")
-        );
-        return ResponseEntity.ok(model);
-    }
-
-    @GetMapping
-    public CollectionModel<EntityModel<PatientDto>> search(
-            @RequestParam(name = "name", required = true) String name) {
-
-        if (name == null || name.trim().isEmpty()) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "O parâmetro 'name' é obrigatório e não pode estar vazio"
-            );
-        }
-
-        List<EntityModel<PatientDto>> all = svc.searchByName(name.trim()).stream()
-                .map(dto -> EntityModel.of(dto,
-                        linkTo(methodOn(PatientController.class).getById(dto.getId())).withSelfRel()))
-                .toList();
-
-        return CollectionModel.of(all,
-                linkTo(methodOn(PatientController.class).search(name.trim())).withSelfRel());
+    @GetMapping("/search")
+    public ResponseEntity<List<PatientDto>> searchByName(@RequestParam String name) {
+        return ResponseEntity.ok(queryService.searchByName(name));
     }
 }

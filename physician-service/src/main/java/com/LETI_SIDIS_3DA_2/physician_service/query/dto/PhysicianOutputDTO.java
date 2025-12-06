@@ -1,4 +1,4 @@
-package com.LETI_SIDIS_3DA_2.physician_service.dto;
+package com.LETI_SIDIS_3DA_2.physician_service.query.dto;
 
 import org.springframework.hateoas.RepresentationModel;
 

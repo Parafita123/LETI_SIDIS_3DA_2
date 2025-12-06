@@ -1,24 +1,24 @@
-package com.LETI_SIDIS_3DA_2.clinical_records_service.dto;
+package com.LETI_SIDIS_3DA_2.clinical_records_service.query.dto;
 
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
+import java.time.LocalDateTime;
 
-public class CreateConsultaRegistoDTO {
-    @NotNull(message = "O ID da consulta é obrigatório.")
+public class ConsultaRegistoOutputDTO {
+    private Long id;
     private Long consultaId;
-
-    @NotBlank(message = "O diagnóstico não pode estar em branco.")
-    @Size(max = 500)
     private String diagnosis;
-
-    @Size(max = 1000)
     private String treatmentRecommendations;
-
-    @Size(max = 1000)
     private String prescriptions;
+    private LocalDateTime createdAt;
 
     // --- ADICIONA OS GETTERS E SETTERS ABAIXO ---
+
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
 
     public Long getConsultaId() {
         return consultaId;
@@ -50,5 +50,13 @@ public class CreateConsultaRegistoDTO {
 
     public void setPrescriptions(String prescriptions) {
         this.prescriptions = prescriptions;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }

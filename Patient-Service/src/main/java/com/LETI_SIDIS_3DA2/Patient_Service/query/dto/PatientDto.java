@@ -1,4 +1,4 @@
-package com.LETI_SIDIS_3DA2.Patient_Service.dto;
+package com.LETI_SIDIS_3DA2.Patient_Service.query.dto;
 
 import java.time.LocalDate;
 import java.util.List;
