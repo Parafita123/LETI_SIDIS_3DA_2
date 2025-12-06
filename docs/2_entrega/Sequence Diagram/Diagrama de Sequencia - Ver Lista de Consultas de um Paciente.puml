@@ -1,12 +1,3 @@
-Aqui está a versão atualizada, sem os valores específicos (como "doc-123"), usando apenas nomes de variáveis genéricas.
-
-Continua a ser Síncrono (porque é uma Leitura/Query) e Não-Coreografado (vai direto à BD).
-
-code
-Plantuml
-download
-content_copy
-expand_less
 @startuml
 title CQRS (Query Side): Ver Detalhes do Paciente (Médico)
 
