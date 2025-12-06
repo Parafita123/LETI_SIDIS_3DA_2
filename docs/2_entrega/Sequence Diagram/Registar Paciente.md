@@ -19,3 +19,5 @@ Etapas do Processo
    Atualização: O Patient Query API consome o evento de registo completo.
    Persistência NoSQL: Grava ou atualiza (UPSERT) uma visão desnormalizada do paciente na Read DB (MongoDB).
    Objetivo: O uso de MongoDB no lado da leitura permite que a aplicação recupere o perfil completo do paciente (incluindo dados aninhados) numa única operação rápida, sem necessidade de joins complexos.
+
+Este diagrama é bastante parecido com o das US 11

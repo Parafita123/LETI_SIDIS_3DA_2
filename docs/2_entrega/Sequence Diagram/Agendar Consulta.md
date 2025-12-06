@@ -20,3 +20,5 @@ Etapas do Processo
    O Scheduling Query API consome o evento de confirmação (AppointmentBookedEvent).
    Os dados são estruturados e gravados na Consultations Read DB.
    Isto garante que as consultas de leitura futuras sejam rápidas e não sobrecarreguem a base de dados transacional, assegurando a Consistência Eventual.
+
+Este diagrama é bastante parecido com o das US 7, 20.

@@ -14,3 +14,5 @@ Fluxo do Processo
 3. Resposta
    Se a relação for validada, o documento do paciente é retornado.
    Os dados são mapeados para um DTO de detalhes e enviados como JSON (200 OK) para o frontend.
+
+Este diagrama é bastante parecido com o das US 2, 10 e 14.

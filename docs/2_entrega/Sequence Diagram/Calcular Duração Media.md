@@ -17,3 +17,5 @@ Fluxo do Processo
 4. Resposta
    Os dados brutos da base de dados são mapeados para um objeto de transferência (DTO).
    O sistema retorna um JSON com a tabela de estatísticas e o código HTTP 200 OK.
+
+Este diagrama é bastante parecido com o das US 17.

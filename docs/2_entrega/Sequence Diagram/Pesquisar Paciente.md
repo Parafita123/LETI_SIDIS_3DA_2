@@ -25,3 +25,5 @@ Resposta Otimizada
 Os dados brutos recuperados da base de dados são convertidos para objetos de transferência (DTOs) leves, contendo apenas a informação necessária para a listagem.
 
 O sistema retorna a lista em formato JSON com o código 200 OK.
+
+Este diagrama é bastante parecido com o das US 3, 14
