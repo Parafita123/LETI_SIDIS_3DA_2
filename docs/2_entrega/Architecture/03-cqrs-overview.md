@@ -4,7 +4,7 @@
 
 Este documento descreve como o padrão **CQRS (Command–Query Responsibility Segregation)** é aplicado aos recursos principais do sistema HAP na Parte 2 do projeto SIDIS:
 
-- **Doctors** (Physician Service)
+- **Physicians** (Physician Service)
 - **Patients** (Patient Service)
 - **Consultations** (Scheduling Service)
 - **Consultation Notes** (Clinical Records Service)
@@ -15,17 +15,15 @@ E como isso se articula com:
 - **Database-per-Service / per microservice instance**
 - **Fan-out entre réplicas** (requisito do trabalho, já descrito no README)
 
-O foco é **Design** (não código), servindo de ponte entre o README (contratos REST) e os documentos de deployment e messaging.
-
 ---
 
 ## 1. Visão geral de CQRS no projeto
 
 ### 1.1 Motivação (ligação ao enunciado SIDIS)
 
-O enunciado da Assignment 2 exige explicitamente a adoção de CQRS para os recursos Doctors, Clients, Consultations e Consultation Notes.
+O enunciado da Assignment 2 exige explicitamente a adoção de CQRS para os recursos Physicians, Patients, Consultations e Consultation Notes.
 
-No estado atual (Parte 1):
+No estado atual:
 
 - Os serviços expõem endpoints REST que **misturam leitura e escrita** sobre o mesmo modelo de dados e a mesma base de dados.
 

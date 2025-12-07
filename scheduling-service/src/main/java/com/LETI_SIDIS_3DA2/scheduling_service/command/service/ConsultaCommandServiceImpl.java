@@ -7,10 +7,11 @@ import com.LETI_SIDIS_3DA2.scheduling_service.command.dto.UpdateConsultaDTO;
 import com.LETI_SIDIS_3DA2.scheduling_service.domain.Consulta;
 import com.LETI_SIDIS_3DA2.scheduling_service.exception.ForbiddenAccessException;
 import com.LETI_SIDIS_3DA2.scheduling_service.exception.ResourceNotFoundException;
+import com.LETI_SIDIS_3DA2.scheduling_service.repository.ConsultaRepository;
 import com.LETI_SIDIS_3DA2.scheduling_service.query.dto.ConsultaOutPutDTO;
 import com.LETI_SIDIS_3DA2.scheduling_service.query.dto.PatientDetailsDTO;
 import com.LETI_SIDIS_3DA2.scheduling_service.query.dto.PhysicianDetailsDTO;
-import com.LETI_SIDIS_3DA2.scheduling_service.repository.ConsultaRepository;
+import com.LETI_SIDIS_3DA2.scheduling_service.messaging.ConsultationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,13 +24,16 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
     private final ConsultaRepository consultaRepo;
     private final PhysicianClient physicianClient;
     private final PatientClient patientClient;
+    private final ConsultationEventPublisher publisher;
 
     public ConsultaCommandServiceImpl(ConsultaRepository consultaRepo,
                                       PhysicianClient physicianClient,
-                                      PatientClient patientClient) {
+                                      PatientClient patientClient,
+                                      ConsultationEventPublisher publisher) {
         this.consultaRepo = consultaRepo;
         this.physicianClient = physicianClient;
         this.patientClient = patientClient;
+        this.publisher = publisher;
     }
 
     @Override
@@ -53,6 +57,15 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
         );
 
         Consulta saved = consultaRepo.save(consulta);
+
+        //Publicar evento após commit
+        publisher.publish(
+                "hap.consultations",
+                "consultation.scheduled",
+                "ConsultationScheduled",
+                saved
+        );
+
         return toDto(saved, patient, physician);
     }
 
@@ -74,6 +87,15 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
 
         consulta.setStatus("CANCELLED");
         Consulta saved = consultaRepo.save(consulta);
+
+        //Publicar evento de cancelamento
+        publisher.publish(
+                "hap.consultations",
+                "consultation.cancelled",
+                "ConsultationCancelled",
+                saved
+        );
+
         var physician = physicianClient.getById(saved.getPhysicianId());
         return toDto(saved, patientOfConsulta, physician);
     }
@@ -82,6 +104,7 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
     @Transactional
     public ConsultaOutPutDTO update(Long id, UpdateConsultaDTO dto,
                                     String requesterUsername, List<String> requesterRoles) {
+
         Consulta consulta = consultaRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Consulta não encontrada com ID: " + id));
 
@@ -99,6 +122,15 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
         if (dto.getNotes() != null) consulta.setNotes(dto.getNotes());
 
         Consulta saved = consultaRepo.save(consulta);
+
+        //Publicar evento de atualização
+        publisher.publish(
+                "hap.consultations",
+                "consultation.updated",
+                "ConsultationUpdated",
+                saved
+        );
+
         var physician = physicianClient.getById(saved.getPhysicianId());
         return toDto(saved, patientOfConsulta, physician);
     }
