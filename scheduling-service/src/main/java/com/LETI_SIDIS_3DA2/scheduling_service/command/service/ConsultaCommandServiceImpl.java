@@ -7,6 +7,7 @@ import com.LETI_SIDIS_3DA2.scheduling_service.command.dto.UpdateConsultaDTO;
 import com.LETI_SIDIS_3DA2.scheduling_service.domain.Consulta;
 import com.LETI_SIDIS_3DA2.scheduling_service.exception.ForbiddenAccessException;
 import com.LETI_SIDIS_3DA2.scheduling_service.exception.ResourceNotFoundException;
+import com.LETI_SIDIS_3DA2.scheduling_service.messaging.ConsultationEventPayload;
 import com.LETI_SIDIS_3DA2.scheduling_service.repository.ConsultaRepository;
 import com.LETI_SIDIS_3DA2.scheduling_service.query.dto.ConsultaOutPutDTO;
 import com.LETI_SIDIS_3DA2.scheduling_service.query.dto.PatientDetailsDTO;
@@ -46,26 +47,38 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
         PhysicianDetailsDTO physician = physicianClient.getById(dto.getPhysicianId());
         PatientDetailsDTO patient   = patientClient.getById(dto.getPatientId());
 
+        // 1) criamos a consulta em estado PENDING (aguarda SAGA)
         Consulta consulta = new Consulta(
                 patient.getId(),
                 physician.getId(),
                 dto.getDateTime(),
                 60,
                 dto.getConsultationType(),
-                "SCHEDULED",
+                "PENDING",                 // <--- antes era "SCHEDULED"
                 dto.getNotes()
         );
 
         Consulta saved = consultaRepo.save(consulta);
 
-        //Publicar evento após commit
-        publisher.publish(
-                "hap.consultations",
-                "consultation.scheduled",
-                "ConsultationScheduled",
-                saved
+        // 2) payload mínimo para o SAGA
+        ConsultationEventPayload payload = new ConsultationEventPayload(
+                saved.getId(),
+                saved.getPatientId(),
+                saved.getPhysicianId(),
+                saved.getDateTime(),
+                saved.getStatus(),
+                saved.getConsultationType()
         );
 
+        // 3) evento de arranque do SAGA de marcação
+        publisher.publish(
+                "hap.sagas",                      // exchange de SAGA
+                "consultation.requested",         // routing key
+                "ConsultationRequested",          // eventType
+                payload
+        );
+
+        // 4) devolvemos a consulta ainda em PENDING ao caller
         return toDto(saved, patient, physician);
     }
 
@@ -85,15 +98,26 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
             throw new ForbiddenAccessException("Não tem permissão para cancelar esta consulta.");
         }
 
-        consulta.setStatus("CANCELLED");
+        // 1) marcamos como CANCELLATION_PENDING (à espera do SAGA)
+        consulta.setStatus("CANCELLATION_PENDING");
         Consulta saved = consultaRepo.save(consulta);
 
-        //Publicar evento de cancelamento
+        // 2) payload para o SAGA
+        ConsultationEventPayload payload = new ConsultationEventPayload(
+                saved.getId(),
+                saved.getPatientId(),
+                saved.getPhysicianId(),
+                saved.getDateTime(),
+                saved.getStatus(),
+                saved.getConsultationType()
+        );
+
+        // 3) evento de arranque do SAGA de cancelamento
         publisher.publish(
-                "hap.consultations",
-                "consultation.cancelled",
-                "ConsultationCancelled",
-                saved
+                "hap.sagas",
+                "consultation.cancellation.requested",
+                "ConsultationCancellationRequested",
+                payload
         );
 
         var physician = physicianClient.getById(saved.getPhysicianId());

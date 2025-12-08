@@ -20,15 +20,12 @@ public class ConsultationEventPublisher {
 
     public void publish(String exchange, String routingKey, String eventType, Object payload) {
 
-        Map<String, Object> message = new HashMap<>();
-        message.put("eventId", UUID.randomUUID().toString());
-        message.put("eventType", eventType);
-        message.put("occurredAt", Instant.now().toString());
-        message.put("sourceService", "scheduling-service");
-        message.put("payload", payload);
+        DomainEvent<Object> event =
+                new DomainEvent<>(eventType, "scheduling-service", payload);
 
-        rabbitTemplate.convertAndSend(exchange, routingKey, message);
 
-        System.out.println("📤 Evento enviado -> " + eventType + " → " + routingKey);
+        rabbitTemplate.convertAndSend(exchange, routingKey, event);
+
+        System.out.println("Evento enviado -> " + eventType + " → " + routingKey);
     }
 }

@@ -25,4 +25,19 @@ public class ConsultationEventPayload {
     }
 
     // getters e setters
+    public Long getId() {return id;}
+    public void setId(Long id) {}
+    public Long getPatientId() { return patientId; }
+    public void setPatientId(Long patientId) { this.patientId = patientId; }
+    public Long getPhysicianId() { return physicianId; }
+    public void setPhysicianId(Long physicianId) {}
+    public LocalDateTime getDateTime() { return dateTime; }
+    public void setDateTime(LocalDateTime dateTime) { this.dateTime = dateTime; }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
+    public String getConsultationType() { return consultationType; }
+    public void setConsultationType(String consultationType) {}
+
 }
+
+

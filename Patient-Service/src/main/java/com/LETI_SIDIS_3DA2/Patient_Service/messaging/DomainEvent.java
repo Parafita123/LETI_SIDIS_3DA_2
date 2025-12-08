@@ -1,32 +1,37 @@
 package com.LETI_SIDIS_3DA2.Patient_Service.messaging;
 
 import java.time.Instant;
+import java.util.UUID;
 
 public class DomainEvent<T> {
 
-    private final String type;
-    private final Instant occurredAt;
-    private final String source;
-    private final T payload;
+    private String eventId = UUID.randomUUID().toString();
+    private String eventType;
+    private Instant occurredAt = Instant.now();
+    private String sourceService;
+    private T payload;
 
+    public DomainEvent() {
+    }
 
-    public DomainEvent(String type, Instant occurredAt, String source, T payload) {
-        this.type = type;
-        this.occurredAt = occurredAt;
-        this.source = source;
+    public DomainEvent(String eventType, String sourceService, T payload) {
+        this.eventType = eventType;
+        this.sourceService = sourceService;
         this.payload = payload;
     }
 
-    public String getType() {
-        return type;
-    }
+    public String getEventId() { return eventId; }
+    public void setEventId(String eventId) { this.eventId = eventId; }
 
-    public Instant getOccurredAt() {
-        return occurredAt;
-    }
+    public String getEventType() { return eventType; }
+    public void setEventType(String eventType) { this.eventType = eventType; }
 
-    public T getPayload() {
-        return payload;
-    }
+    public Instant getOccurredAt() { return occurredAt; }
+    public void setOccurredAt(Instant occurredAt) { this.occurredAt = occurredAt; }
+
+    public String getSourceService() { return sourceService; }
+    public void setSourceService(String sourceService) { this.sourceService = sourceService; }
+
+    public T getPayload() { return payload; }
+    public void setPayload(T payload) { this.payload = payload; }
 }
-

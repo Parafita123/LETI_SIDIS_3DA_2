@@ -24,7 +24,7 @@ public class PatientEventPublisher {
     public void publish(String routingKey, String eventType, PatientEventPayload payload) {
 
         DomainEvent<PatientEventPayload> event =
-                new DomainEvent<>(eventType, Instant.now(), "patient-service", payload);
+                new DomainEvent<>(eventType, "patient-service", payload);
 
         rabbitTemplate.convertAndSend(patientsExchange, routingKey, event);
     }
