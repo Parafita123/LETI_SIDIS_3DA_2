@@ -108,7 +108,7 @@ public class ConsultationSagaListener {
         physicianCmdPayload.put("dateTime", payload.get("dateTime"));
 
         DomainEvent<Map<String, Object>> checkPhysician =
-                new DomainEvent<>("CheckPhysicianAvailability",
+                new DomainEvent<>("CheckPhysicianAvailabilityForConsultation",
                         "scheduling-service", physicianCmdPayload);
 
         rabbitTemplate.convertAndSend(

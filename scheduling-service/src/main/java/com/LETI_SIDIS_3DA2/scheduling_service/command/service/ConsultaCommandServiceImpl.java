@@ -72,7 +72,7 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
 
         // 3) evento de arranque do SAGA de marcação
         publisher.publish(
-                "hap.sagas",                      // exchange de SAGA
+                "hap.saga",                      // exchange de SAGA
                 "consultation.requested",         // routing key
                 "ConsultationRequested",          // eventType
                 payload
@@ -114,7 +114,7 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
 
         // 3) evento de arranque do SAGA de cancelamento
         publisher.publish(
-                "hap.sagas",
+                "hap.saga",
                 "consultation.cancellation.requested",
                 "ConsultationCancellationRequested",
                 payload

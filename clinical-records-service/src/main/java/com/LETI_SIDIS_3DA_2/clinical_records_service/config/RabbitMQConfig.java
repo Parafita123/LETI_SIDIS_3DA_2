@@ -11,12 +11,12 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    @Value("${rabbitmq.exchange}")
-    private String exchangeName;
+    @Value("${hap.messaging.exchanges.clinicalrecords}")
+    private String clinicalrecordsExchangeName;
 
     @Bean
     public TopicExchange topicExchange() {
-        return new TopicExchange(exchangeName, true, false);
+        return new TopicExchange(clinicalrecordsExchangeName, true, false);
     }
 
     @Bean

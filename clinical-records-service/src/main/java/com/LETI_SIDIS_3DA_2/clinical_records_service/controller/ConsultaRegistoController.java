@@ -1,4 +1,4 @@
-package com.LETI_SIDIS_3DA_2.clinical_records_service.controller;
+/*package com.LETI_SIDIS_3DA_2.clinical_records_service.controller;
 
 import com.LETI_SIDIS_3DA_2.clinical_records_service.command.dto.CreateConsultaRegistoDTO;
 import com.LETI_SIDIS_3DA_2.clinical_records_service.query.dto.ConsultaRegistoOutputDTO;
@@ -6,9 +6,9 @@ import com.LETI_SIDIS_3DA_2.clinical_records_service.query.dto.ConsultaRegistoOu
 // Exceções
 import com.LETI_SIDIS_3DA_2.clinical_records_service.exception.DuplicateResourceException;
 import com.LETI_SIDIS_3DA_2.clinical_records_service.exception.ResourceNotFoundException;
-
+import com.LETI_SIDIS_3DA_2.clinical_records_service.query.service.ConsultaRegistoQueryService;
 // Serviços
-import com.LETI_SIDIS_3DA_2.clinical_records_service.service.ConsultaRegistoService;
+import com.LETI_SIDIS_3DA_2.clinical_records_service.command.service.ConsultaRegistoCommandService;
 
 // Validação
 import jakarta.validation.Valid;
@@ -52,4 +52,5 @@ public class ConsultaRegistoController {
                 .map(ResponseEntity::ok)
                 .orElseThrow(() -> new ResourceNotFoundException("Registo não encontrado para a consulta com ID: " + consultaId));
     }
-}
+}*/
+

@@ -10,7 +10,7 @@ import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
+import org.springframework.dao.DataIntegrityViolationException;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.Random;
@@ -29,7 +29,6 @@ public class InitialDataSetup implements CommandLineRunner {
     private Random random = new Random();
 
     @Override
-    @Transactional
     public void run(String... args) throws Exception {
         System.out.println(">>> Executing Initial Data Setup for Scheduling Service...");
 
@@ -63,14 +62,23 @@ public class InitialDataSetup implements CommandLineRunner {
 
     // --- Métodos Helper ---
 
-    private void createUserIfNotFound(String username, String rawPassword, String role, String email, String phoneNumber) {
-        Optional<User> existingUser = userRepository.findByUsername(username);
-        if (existingUser.isEmpty()) {
-            String encodedPassword = passwordEncoder.encode(rawPassword);
-            User newUser = new User(username, encodedPassword, role, email, phoneNumber);
-            userRepository.save(newUser);
-            System.out.println("Created Test User: " + username);
-        }
+    private void createUserIfNotFound(String username, String rawPassword, String role,
+                                      String email, String phoneNumber) {
+        // 1º: tenta ver se já existe
+        userRepository.findByUsername(username).ifPresentOrElse(existing -> {
+            System.out.println("User " + username + " já existe (query). Id = " + existing.getId());
+        }, () -> {
+            // 2º: se não existir, tenta criar
+            try {
+                String encodedPassword = passwordEncoder.encode(rawPassword);
+                User newUser = new User(username, encodedPassword, role, email, phoneNumber);
+                userRepository.save(newUser);
+                System.out.println("Created Test User: " + username);
+            } catch (org.springframework.dao.DataIntegrityViolationException ex) {
+                // Corrida / dados antigos na DB
+                System.out.println("User " + username + " já existe (constraint DB). Ignorando.");
+            }
+        });
     }
 
     private void createConsultaIfNotFound(Long patientId, Long physicianId, LocalDateTime dateTime,

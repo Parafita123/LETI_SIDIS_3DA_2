@@ -12,20 +12,20 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class MessagingConfig {
 
-    @Value("${hap.messaging.consultations-exchange}")
+    @Value("${hap.messaging.consultations.exchange}")
     private String consultationsExchangeName;
 
-    @Value("${hap.messaging.sagas-exchange}")
-    private String sagasExchangeName;
+    @Value("${hap.messaging.saga.exchange}")
+    private String sagaExchangeName;
 
     @Value("${hap.messaging.scheduling.saga-queue}")
     private String schedulingSagaQueueName;
 
     //  CQRS Read Model
-    @Value("${hap.messaging.patients-exchange}")
+    @Value("${hap.messaging.patients.exchange}")
     private String patientsExchangeName;
 
-    @Value("${hap.messaging.physicians-exchange}")
+    @Value("${hap.messaging.physicians.exchange}")
     private String physiciansExchangeName;
 
     @Value("${hap.messaging.readmodel.queue}")
@@ -39,8 +39,8 @@ public class MessagingConfig {
     }
 
     @Bean
-    public TopicExchange sagasExchange() {
-        return new TopicExchange(sagasExchangeName, true, false);
+    public TopicExchange sagaExchange() {
+        return new TopicExchange(sagaExchangeName, true, false);
     }
 
     @Bean
@@ -62,10 +62,10 @@ public class MessagingConfig {
 
     @Bean
     public Binding schedulingSagaBinding(Queue schedulingSagaQueue,
-                                         TopicExchange sagasExchange) {
+                                         TopicExchange sagaExchange) {
         return BindingBuilder
                 .bind(schedulingSagaQueue)
-                .to(sagasExchange)
+                .to(sagaExchange)
                 .with("saga.consultation.*");
     }
 
