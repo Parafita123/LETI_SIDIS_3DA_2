@@ -1,4 +1,4 @@
-package com.LETI_SIDIS_3DA_2.clinical_records_service.service;
+/*package com.LETI_SIDIS_3DA_2.clinical_records_service.service;
 
 import com.LETI_SIDIS_3DA_2.clinical_records_service.domain.ConsultaRegisto;
 import com.LETI_SIDIS_3DA_2.clinical_records_service.command.dto.CreateConsultaRegistoDTO;
@@ -103,3 +103,5 @@ public class ConsultaRegistoServiceImpl implements ConsultaRegistoService { // G
         }
     }
 }
+
+ */

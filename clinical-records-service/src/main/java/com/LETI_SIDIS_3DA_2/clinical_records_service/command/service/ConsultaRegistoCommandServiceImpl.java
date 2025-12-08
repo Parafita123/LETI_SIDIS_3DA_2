@@ -13,7 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
-
+import com.LETI_SIDIS_3DA_2.clinical_records_service.messaging.ClinicalRecordEventPublisher;
 import java.time.LocalDateTime;
 
 @Service
@@ -22,13 +22,17 @@ public class ConsultaRegistoCommandServiceImpl implements ConsultaRegistoCommand
     private final ConsultaRegistoRepository recordRepository;
     private final RestTemplate restTemplate;
 
+
     @Value("${services.scheduling.url}")
     private String schedulingServiceUrl;
+    private final ClinicalRecordEventPublisher eventPublisher;
+
 
     public ConsultaRegistoCommandServiceImpl(ConsultaRegistoRepository recordRepository,
-                                             RestTemplate restTemplate) {
+                                             RestTemplate restTemplate, ClinicalRecordEventPublisher eventPublisher) {
         this.recordRepository = recordRepository;
         this.restTemplate = restTemplate;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -58,6 +62,9 @@ public class ConsultaRegistoCommandServiceImpl implements ConsultaRegistoCommand
         );
 
         ConsultaRegisto saved = recordRepository.save(record);
+        // publicar evento
+        eventPublisher.publishClinicalRecordCreated(saved);
+
         return convertToDTO(saved);
     }
 

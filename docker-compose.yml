@@ -67,6 +67,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    depends_on:
+      - rabbitmq
     ports:
       - "8083:8083"
 
@@ -76,6 +78,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    depends_on:
+      - rabbitmq
     ports:
       - "8089:8083"
 
@@ -88,6 +92,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    depends_on:
+      - rabbitmq
     ports:
       - "8082:8082"
 
@@ -97,6 +103,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    depends_on:
+      - rabbitmq
     ports:
       - "8090:8082"
 

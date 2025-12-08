@@ -4,6 +4,9 @@ import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+
+
 @Component
 public class PatientEventPublisher {
 
@@ -21,7 +24,7 @@ public class PatientEventPublisher {
     public void publish(String routingKey, String eventType, PatientEventPayload payload) {
 
         DomainEvent<PatientEventPayload> event =
-                new DomainEvent<>(eventType, "patient-service", payload);
+                new DomainEvent<>(eventType, Instant.now(), "patient-service", payload);
 
         rabbitTemplate.convertAndSend(patientsExchange, routingKey, event);
     }
