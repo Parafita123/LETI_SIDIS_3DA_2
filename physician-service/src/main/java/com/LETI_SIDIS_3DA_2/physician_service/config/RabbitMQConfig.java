@@ -14,11 +14,14 @@ public class RabbitMQConfig {
     @Value("${rabbitmq.exchange}")
     private String exchangeName;
 
-    @Bean
-    public TopicExchange topicExchange() {
-        return new TopicExchange(exchangeName, true, false);
-    }
 
+    @Value("${hap.messaging.exchanges.physicians}")
+    private String physiciansExchangeName;
+    
+    @Bean
+    public TopicExchange physiciansExchange() {
+        return new TopicExchange(physiciansExchangeName, true, false);
+    }
     @Bean
     public Jackson2JsonMessageConverter messageConverter() {
         return new Jackson2JsonMessageConverter();

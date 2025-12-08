@@ -4,6 +4,8 @@ import com.LETI_SIDIS_3DA2.Patient_Service.command.dto.PatientCreateDto;
 import com.LETI_SIDIS_3DA2.Patient_Service.command.dto.PatientUpdateDto;
 import com.LETI_SIDIS_3DA2.Patient_Service.domain.Patient;
 import com.LETI_SIDIS_3DA2.Patient_Service.exception.ResourceNotFoundException;
+import com.LETI_SIDIS_3DA2.Patient_Service.messaging.PatientEventPayload;
+import com.LETI_SIDIS_3DA2.Patient_Service.messaging.PatientEventPublisher;
 import com.LETI_SIDIS_3DA2.Patient_Service.query.dto.PatientDto;
 import com.LETI_SIDIS_3DA2.Patient_Service.repository.PatientRepository;
 import org.springframework.stereotype.Service;
@@ -14,9 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class PatientCommandServiceImpl implements PatientCommandService {
 
     private final PatientRepository repo;
+    private final PatientEventPublisher eventPublisher;
 
-    public PatientCommandServiceImpl(PatientRepository repo) {
+    public PatientCommandServiceImpl(PatientRepository repo, PatientEventPublisher eventPublisher ) {
         this.repo = repo;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -39,6 +43,21 @@ public class PatientCommandServiceImpl implements PatientCommandService {
         p.setHealthConcerns(in.healthConcerns);
 
         Patient saved = repo.save(p);
+
+        PatientEventPayload payload = new PatientEventPayload(
+                saved.getId(),
+                saved.getFullName(),
+                saved.getEmail(),
+                saved.getBirthDateLocal(),
+                saved.getPhoneNumber(),
+                saved.getInsuranceCompany(),
+                saved.getInsurancePolicyNumber(),
+                saved.getPhotoUrl(),
+                saved.getHealthConcerns()
+        );
+
+        eventPublisher.publish("patient.registered", "PatientRegistered", payload);
+
         return toDto(saved);
     }
 
@@ -56,6 +75,21 @@ public class PatientCommandServiceImpl implements PatientCommandService {
         p.setHealthConcerns(in.healthConcerns);
 
         Patient saved = repo.save(p);
+
+        PatientEventPayload payload = new PatientEventPayload(
+                saved.getId(),
+                saved.getFullName(),
+                saved.getEmail(),
+                saved.getBirthDateLocal(),
+                saved.getPhoneNumber(),
+                saved.getInsuranceCompany(),
+                saved.getInsurancePolicyNumber(),
+                saved.getPhotoUrl(),
+                saved.getHealthConcerns()
+        );
+
+        eventPublisher.publish("patient.updated", "PatientUpdated", payload);
+
         return toDto(saved);
     }
 

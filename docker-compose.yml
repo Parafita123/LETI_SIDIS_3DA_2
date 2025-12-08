@@ -42,6 +42,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    depends_on:
+        - rabbitmq
     ports:
       - "8081:8081"
 
@@ -51,6 +53,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: docker
       JAVA_TOOL_OPTIONS: "-Dh2.webAllowOthers=true"
+    depends_on:
+      - rabbitmq
     ports:
       - "8088:8081"   # mesma app, outra porta externa
 

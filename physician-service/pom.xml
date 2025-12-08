@@ -96,6 +96,7 @@
 			<groupId>org.springframework.amqp</groupId>
 			<artifactId>spring-amqp</artifactId>
 		</dependency>
+
 	</dependencies>
 
 	<build>

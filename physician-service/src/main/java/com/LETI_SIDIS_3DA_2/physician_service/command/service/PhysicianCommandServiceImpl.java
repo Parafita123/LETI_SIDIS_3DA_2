@@ -6,6 +6,8 @@ import com.LETI_SIDIS_3DA_2.physician_service.domain.Specialization;
 import com.LETI_SIDIS_3DA_2.physician_service.command.dto.RegisterPhysicianDTO;
 import com.LETI_SIDIS_3DA_2.physician_service.exception.DuplicateResourceException;
 import com.LETI_SIDIS_3DA_2.physician_service.exception.ResourceNotFoundException;
+import com.LETI_SIDIS_3DA_2.physician_service.messaging.PhysicianEventPayload;
+import com.LETI_SIDIS_3DA_2.physician_service.messaging.PhysicianEventPublisher;
 import com.LETI_SIDIS_3DA_2.physician_service.query.dto.PhysicianOutputDTO;
 import com.LETI_SIDIS_3DA_2.physician_service.repository.DepartmentRepository;
 import com.LETI_SIDIS_3DA_2.physician_service.repository.PhysicianRepository;
@@ -15,7 +17,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
-
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
@@ -29,14 +30,18 @@ public class PhysicianCommandServiceImpl implements PhysicianCommandService {
     private final FileStorageService fileStorageService;
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("HH:mm");
 
+    private final PhysicianEventPublisher eventPublisher;
+
     public PhysicianCommandServiceImpl(PhysicianRepository physicianRepository,
                                        SpecializationRepository specializationRepository,
                                        DepartmentRepository departmentRepository,
-                                       FileStorageService fileStorageService) {
+                                       FileStorageService fileStorageService,
+                                       PhysicianEventPublisher eventPublisher) {
         this.physicianRepository = physicianRepository;
         this.specializationRepository = specializationRepository;
         this.departmentRepository = departmentRepository;
         this.fileStorageService = fileStorageService;
+        this.eventPublisher = eventPublisher;
     }
 
     // --- helpers compartilhados (podes pôr isto num mapper separado, se quiseres) ---
@@ -115,6 +120,20 @@ public class PhysicianCommandServiceImpl implements PhysicianCommandService {
         }
 
         Physician savedPhysician = physicianRepository.save(physician);
+
+        PhysicianEventPayload payload = new PhysicianEventPayload(
+                savedPhysician.getId(),
+                savedPhysician.getFullName(),
+                savedPhysician.getSpecialty().getName(),
+                savedPhysician.getDepartment().getAcronym(),
+                savedPhysician.getEmail(),
+                savedPhysician.getPhoneNumber(),
+                savedPhysician.getWorkStartTime(),
+                savedPhysician.getWorkEndTime()
+        );
+
+        eventPublisher.publishPhysicianCreated(PhysicianEventPayload.fromDomain(savedPhysician));
+
         return convertToDTO(savedPhysician);
     }
 
@@ -165,6 +184,20 @@ public class PhysicianCommandServiceImpl implements PhysicianCommandService {
         physicianToUpdate.setOptionalDescription(physicianDTO.getOptionalDescription());
 
         Physician updatedPhysician = physicianRepository.save(physicianToUpdate);
+
+        PhysicianEventPayload payload = new PhysicianEventPayload(
+                updatedPhysician.getId(),
+                updatedPhysician.getFullName(),
+                updatedPhysician.getSpecialty().getName(),
+                updatedPhysician.getDepartment().getAcronym(),
+                updatedPhysician.getEmail(),
+                updatedPhysician.getPhoneNumber(),
+                updatedPhysician.getWorkStartTime(),
+                updatedPhysician.getWorkEndTime()
+        );
+
+        eventPublisher.publishPhysicianUpdated(PhysicianEventPayload.fromDomain(updatedPhysician));
+
         return convertToDTO(updatedPhysician);
     }
 }
