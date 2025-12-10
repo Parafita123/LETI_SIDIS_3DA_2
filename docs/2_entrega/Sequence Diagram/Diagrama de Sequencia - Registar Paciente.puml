@@ -8,7 +8,7 @@ database "Patient Write DB\n(PostgreSQL)" as WDB
 queue "Message Broker\n(RabbitMQ)" as Broker
 participant "Identity Service" as IdentitySvc
 participant "Patient Query API" as PatQuery
-database "Patient Read DB\n(MongoDB)" as RDB
+database "Patient Read DB\n" as RDB
 
 autonumber
 
