@@ -1,0 +1,109 @@
+@startuml
+title COMMAND SIDE: Registo de Médico (Saga + Event Sourcing + Tracing)
+
+actor "Admin" as Admin
+participant "API Gateway\n(Ingress)" as Gateway
+participant "Physician\nCommand API" as PhyCmd
+database "Event Store\n(Write DB)" as EventStore
+queue "RabbitMQ\n(Broker)" as Broker
+participant "Identity\nService" as IdentitySvc
+participant "Physician\nQuery API" as PhyQuery
+database "Read DB\n(Projection)" as RDB
+
+autonumber
+
+box "Kubernetes Cluster (HAP Namespace)" #f9f9f9
+    participant Gateway
+    participant PhyCmd
+    participant EventStore
+    participant Broker
+    participant IdentitySvc
+    participant PhyQuery
+    participant RDB
+end box
+
+== 1. Início da Saga (Command) ==
+
+Admin -> Gateway : POST /physicians\n{nome, licenca, email...}
+
+activate Gateway
+    Gateway -> Gateway : Valida JWT (Role: ADMIN)
+    Gateway -> Gateway : Gera **Trace-ID: tr-777**
+
+    Gateway -> PhyCmd : POST /physicians\n[Header: X-Trace-ID: tr-777]\n[mTLS]
+
+    activate PhyCmd
+        note right of PhyCmd
+           **Event Sourcing:**
+           Grava a intenção de criar.
+           Estado implícito: PENDING_ID
+        end note
+
+        PhyCmd -> EventStore : **APPEND** PhysicianCreatedEvent
+        activate EventStore
+            EventStore --> PhyCmd : Stored
+        deactivate EventStore
+
+        note right of PhyCmd
+           **Resilience4j:**
+           Retry Policy configurada
+           para publicação no Broker.
+        end note
+
+        PhyCmd -> Broker : Publish **PhysicianCreatedEvent**\n[Trace-ID: tr-777]
+
+        PhyCmd --> Gateway : 202 Accepted
+    deactivate PhyCmd
+
+    Gateway --> Admin : 202 Accepted
+deactivate Gateway
+
+== 2. Passo Externo da Saga (Identity) ==
+
+activate IdentitySvc
+    Broker -> IdentitySvc : Consume PhysicianCreatedEvent\n[Trace-ID: tr-777]
+
+    IdentitySvc -> IdentitySvc : **Log:** Processing tr-777
+
+    alt Sucesso na Criação de Credenciais
+        IdentitySvc -> IdentitySvc : Create User (Role: DOCTOR)
+        IdentitySvc -> Broker : Publish **PhysicianIdentityCreatedEvent**\n{authId, physicianId}\n[Trace-ID: tr-777]
+
+    else Falha (ex: Email duplicado)
+        IdentitySvc -> Broker : Publish **PhysicianIdentityFailedEvent**\n[Trace-ID: tr-777]
+    end
+deactivate IdentitySvc
+
+== 3. Consolidação (Event Sourcing) ==
+
+activate PhyCmd
+    Broker -> PhyCmd : Consume Identity Events
+
+    PhyCmd -> EventStore : Load History (Rehydrate)
+
+    alt Sucesso (Identity Created)
+        PhyCmd -> EventStore : **APPEND** PhysicianActivatedEvent
+        note right of PhyCmd
+           O médico passa a estar
+           disponível para consultas.
+        end note
+        PhyCmd -> Broker : Publish **PhysicianActivatedEvent**
+
+    else Falha (Identity Failed)
+        PhyCmd -> EventStore : **APPEND** PhysicianRegistrationRejectedEvent
+        note left of PhyCmd
+           **Saga Rollback:**
+           O processo termina em erro.
+        end note
+    end
+deactivate PhyCmd
+
+== 4. Atualização de Leitura (CQRS Projection) ==
+
+activate PhyQuery
+    Broker -> PhyQuery : Consume PhysicianActivatedEvent
+    PhyQuery -> RDB : UPSERT PhysicianView\n(Dados + AuthID)
+    RDB --> PhyQuery : OK
+deactivate PhyQuery
+
+@enduml
