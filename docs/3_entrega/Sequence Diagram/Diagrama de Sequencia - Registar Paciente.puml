@@ -1,0 +1,116 @@
+@startuml
+title COMMAND SIDE: Registo de Paciente (Saga + Event Sourcing + Observabilidade)
+
+actor "Recepcionista" as User
+participant "API Gateway\n(Ingress)" as Gateway
+participant "Patient\nCommand API" as PatCmd
+database "Event Store\n(Write DB)" as EventStore
+queue "RabbitMQ\n(Broker)" as Broker
+participant "Identity\nService" as IdentitySvc
+participant "Patient\nQuery API" as PatQuery
+database "Read DB\n(Projection)" as RDB
+
+autonumber
+
+box "Cluster Kubernetes (Namespace: HAP)" #f9f9f9
+    participant Gateway
+    participant PatCmd
+    participant EventStore
+    participant Broker
+    participant IdentitySvc
+    participant PatQuery
+    participant RDB
+end box
+
+note right of User
+  **Assignment 3 Context:**
+  - **Security:** Token JWT (Role: STAFF)
+  - **Tracing:** TraceID único
+  - **Persistence:** Event Store
+  - **Saga:** Gestão de Transação Distribuída
+end note
+
+== 1. Início da Saga (Command) ==
+
+User -> Gateway : POST /patients\n{nome, email, nif...}
+
+activate Gateway
+    Gateway -> Gateway : Valida JWT (Role: STAFF)
+    Gateway -> Gateway : Gera **Trace-ID: tr-555**
+
+    Gateway -> PatCmd : POST /patients\n[Header: X-Trace-ID: tr-555]\n[mTLS]
+
+    activate PatCmd
+        note right of PatCmd
+           **Event Sourcing:**
+           Grava evento inicial.
+           Status implícito: PENDING
+        end note
+
+        PatCmd -> EventStore : **APPEND** PatientRegistrationStartedEvent
+        activate EventStore
+            EventStore --> PatCmd : Stored
+        deactivate EventStore
+
+        PatCmd -> Broker : Publish **PatientRegistrationStartedEvent**\n[Trace-ID: tr-555]
+
+        PatCmd --> Gateway : 202 Accepted
+    deactivate PatCmd
+
+    Gateway --> User : 202 Accepted\n"Processo iniciado."
+deactivate Gateway
+
+== 2. Passo Externo (Identity Service) ==
+
+activate IdentitySvc
+    Broker -> IdentitySvc : Consume StartedEvent\n[Trace-ID: tr-555]
+
+    IdentitySvc -> IdentitySvc : **Log:** Processing tr-555
+
+    alt Sucesso (Criação Auth0/Keycloak)
+        IdentitySvc -> IdentitySvc : Create User Credentials
+        IdentitySvc -> Broker : Publish **PatientIdentityCreatedEvent**\n{authId, patientId}\n[Trace-ID: tr-555]
+
+    else Falha (Email já existe / Serviço Down)
+        IdentitySvc -> Broker : Publish **PatientIdentityFailedEvent**\n[Trace-ID: tr-555]
+    end
+deactivate IdentitySvc
+
+== 3. Consolidação (Event Sourcing) ==
+
+activate PatCmd
+    Broker -> PatCmd : Consume Identity Events
+
+    PatCmd -> EventStore : Load History (Rehydrate)
+
+    alt Caminho Feliz (Sucesso)
+        PatCmd -> EventStore : **APPEND** PatientActivatedEvent
+        note right of PatCmd
+           Confirma que o paciente
+           está ativo e tem login.
+        end note
+        PatCmd -> Broker : Publish **PatientActivatedEvent**
+
+    else Caminho de Falha (Saga Rollback)
+        PatCmd -> EventStore : **APPEND** PatientRegistrationRejectedEvent
+        note left of PatCmd
+           **Compensação:**
+           Marca o registo como falhado.
+           Nenhum dado é apagado (Audit).
+        end note
+    end
+deactivate PatCmd
+
+== 4. Projeção de Leitura (CQRS) ==
+
+activate PatQuery
+    Broker -> PatQuery : Consume PatientActivatedEvent
+    PatQuery -> RDB : UPSERT PatientView
+    note right of PatQuery
+       Atualiza a base de leitura para
+       que o paciente apareça nas pesquisas.
+    end note
+    RDB --> PatQuery : OK
+deactivate PatQuery
+
+@enduml

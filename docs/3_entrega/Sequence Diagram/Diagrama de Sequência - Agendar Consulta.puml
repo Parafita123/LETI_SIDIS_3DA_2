@@ -1,0 +1,131 @@
+@startuml
+title COMMAND SIDE: Agendar Consulta (Saga + Event Sourcing + Observabilidade)
+
+actor "Paciente" as User
+participant "API Gateway\n(Ingress)" as Gateway
+participant "Scheduling\nCommand API" as SchedCmd
+database "Event Store\n(Write DB)" as EventStore
+queue "RabbitMQ\n(Broker)" as Broker
+participant "Patient\nService" as PatSvc
+participant "Physician\nService" as DocSvc
+participant "Scheduling\nQuery API" as SchedQuery
+database "Read DB\n(Projection)" as RDB
+
+autonumber
+
+box "Kubernetes Cluster (Namespace: HAP)" #f9f9f9
+    participant Gateway
+    participant SchedCmd
+    participant EventStore
+    participant Broker
+    participant PatSvc
+    participant DocSvc
+    participant SchedQuery
+    participant RDB
+end box
+
+note right of User
+  **Assignment 3 Stack:**
+  - **Auth:** JWT (Zero Trust)
+  - **Trace:** OpenTelemetry (Trace-ID)
+  - **Pattern:** Saga (Choreography)
+  - **DB:** Event Store (Append Only)
+end note
+
+== 1. Início do Agendamento (Comando) ==
+
+User -> Gateway : POST /appointments\n{patientId, physicianId, time}
+
+activate Gateway
+    Gateway -> Gateway : Valida JWT
+    Gateway -> Gateway : Gera **Trace-ID: tr-2025**
+
+    Gateway -> SchedCmd : POST /appointments\n[Header: X-Trace-ID: tr-2025]\n[mTLS Encrypted]
+
+    activate SchedCmd
+        note right of SchedCmd
+           **Event Sourcing:**
+           Não faz INSERT de estado.
+           Apenas anexa o evento inicial.
+        end note
+
+        SchedCmd -> SchedCmd : Cria AppointmentAggregate
+
+        SchedCmd -> EventStore : **APPEND** AppointmentCreatedEvent
+        activate EventStore
+            EventStore --> SchedCmd : Stored (Sequence 1)
+        deactivate EventStore
+
+        note right of SchedCmd
+           **Resilience4j:**
+           Retry Pattern no envio
+           para o Broker.
+        end note
+
+        SchedCmd -> Broker : Publish **AppointmentCreatedEvent**\n[Trace-ID: tr-2025]
+
+        SchedCmd --> Gateway : 202 Accepted (Location: /status/...)
+    deactivate SchedCmd
+
+    Gateway --> User : 202 Accepted
+deactivate Gateway
+
+== 2. Saga: Validações Paralelas (Coreografia) ==
+
+par Validação Distribuída
+    group Validação de Paciente
+        activate PatSvc
+        Broker -> PatSvc : Consume CreatedEvent\n[Trace-ID: tr-2025]
+        PatSvc -> PatSvc : Valida Regras/Dívidas
+        PatSvc -> Broker : Publish **PatientValidatedEvent**\n[Trace-ID: tr-2025]
+        deactivate PatSvc
+    end
+
+    group Validação de Médico
+        activate DocSvc
+        Broker -> DocSvc : Consume CreatedEvent\n[Trace-ID: tr-2025]
+        DocSvc -> DocSvc : Valida Disponibilidade
+        DocSvc -> Broker : Publish **PhysicianConfirmedEvent**\n[Trace-ID: tr-2025]
+        deactivate DocSvc
+    end
+end
+
+== 3. Conclusão da Saga (Aggregator) ==
+
+activate SchedCmd
+    Broker -> SchedCmd : Consume Validation Events\n(PatientValidated OR PhysicianConfirmed)
+
+    SchedCmd -> EventStore : Load History (Rehydrate Stream)
+    EventStore --> SchedCmd : [CreatedEvent, ...]
+
+    SchedCmd -> SchedCmd : Reconstrói Estado em Memória
+
+    alt Estado Completo (Recebeu Ambas Validações)
+        SchedCmd -> EventStore : **APPEND** AppointmentBookedEvent
+
+        note left of SchedCmd
+           O Agendamento só é confirmado
+           quando todos os eventos necessários
+           estão no histórico.
+        end note
+
+        SchedCmd -> Broker : Publish **AppointmentBookedEvent**\n[Trace-ID: tr-2025]
+
+    else Estado Parcial (Falta uma validação)
+        SchedCmd -> SchedCmd : Aguarda próximo evento
+        note right of SchedCmd
+           Idempotência garantida pelo
+           Event Store versioning.
+        end note
+    end
+deactivate SchedCmd
+
+== 4. Atualização de Leitura (CQRS Projection) ==
+
+activate SchedQuery
+    Broker -> SchedQuery : Consume AppointmentBookedEvent
+    SchedQuery -> RDB : UPSERT AppointmentView\n(Dados prontos para leitura)
+    RDB --> SchedQuery : OK
+deactivate SchedQuery
+
+@enduml
