@@ -6,7 +6,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.authentication.WebAuthenticationDetailsSource;
@@ -21,8 +20,21 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
 
+    private static final List<String> SKIP_PREFIXES = List.of(
+            "/actuator",
+            "/swagger-ui",
+            "/v3/api-docs",
+            "/h2-console"
+    );
+
     public JwtAuthenticationFilter(JwtUtil jwtUtil) {
         this.jwtUtil = jwtUtil;
+    }
+
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        String path = request.getServletPath();
+        return SKIP_PREFIXES.stream().anyMatch(path::startsWith);
     }
 
     @Override
@@ -48,23 +60,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             String username = jwtUtil.extractUsername(token);
             if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
 
-                // Lê authorities do JWT (authorities → fallback roles). Pode vir vazio.
                 List<String> fromJwt = jwtUtil.extractRoles(token);
 
-                // Constrói a lista de GrantedAuthority (prefixa ROLE_ quando necessário)
                 List<SimpleGrantedAuthority> authorities = fromJwt.stream()
                         .map(r -> r.startsWith("ROLE_") ? r : "ROLE_" + r)
                         .map(SimpleGrantedAuthority::new)
                         .toList();
 
-                // Se vier vazio, autenticamos na mesma (sem authorities) — chega para .authenticated()
                 UsernamePasswordAuthenticationToken authToken =
                         new UsernamePasswordAuthenticationToken(username, null, authorities);
 
                 authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
-
         } catch (Exception ignored) { }
 
         chain.doFilter(request, response);

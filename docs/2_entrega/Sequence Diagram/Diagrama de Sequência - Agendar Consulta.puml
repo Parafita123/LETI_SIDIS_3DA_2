@@ -15,7 +15,7 @@ autonumber
 
 == 1. Início do Agendamento (Comando) ==
 
-User -> Gateway : POST /appointments\n{patientId, physicianId, time}
+User -> Gateway : POST /api/consultas\n{patientId, physicianId, time}
 Gateway -> SchedCmd : POST /appointments
 
 activate SchedCmd
@@ -25,10 +25,10 @@ activate SchedCmd
 
     SchedCmd -> Broker : publish **AppointmentCreatedEvent**\n{apptId, patientId, physicianId...}
 
-    SchedCmd --> Gateway : 202 Accepted
+    SchedCmd --> Gateway : 201 Created
 deactivate SchedCmd
 
-Gateway --> User : 202 Accepted\n"A processar agendamento..."
+Gateway --> User : 201 Created\n"A processar agendamento..."
 
 == 2. Saga: Validações Paralelas (Coreografia) ==
 

@@ -125,6 +125,9 @@ public class ConsultationSagaListener {
         }
         if (correlationId != null) {
             message.getMessageProperties().setHeader("x-correlation-id", correlationId);
+
+            // AMQP standard correlation id
+            message.getMessageProperties().setCorrelationId(correlationId);
         }
         return message;
     }

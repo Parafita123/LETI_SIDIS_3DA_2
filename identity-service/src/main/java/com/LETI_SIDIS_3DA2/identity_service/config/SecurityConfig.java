@@ -22,13 +22,11 @@ public class SecurityConfig {
         this.userDetailsService = userDetailsService;
     }
 
-    // Encoder para as passwords dos utilizadores do Identity
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // Provider que usa o teu UserDetailsService + encoder
     @Bean
     public DaoAuthenticationProvider daoAuthenticationProvider() {
         DaoAuthenticationProvider p = new DaoAuthenticationProvider();
@@ -37,13 +35,11 @@ public class SecurityConfig {
         return p;
     }
 
-    // Expor o AuthenticationManager para o AuthController
     @Bean
     public AuthenticationManager authenticationManager(AuthenticationConfiguration config) throws Exception {
-        return config.getAuthenticationManager(); // compõe a partir dos providers registados (DaoAuthenticationProvider)
+        return config.getAuthenticationManager();
     }
 
-    // Chain simples: Identity só emite tokens; não valida JWT de entrada
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
@@ -52,7 +48,14 @@ public class SecurityConfig {
                 .headers(h -> h.frameOptions(f -> f.sameOrigin()))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/api/auth/**", "/h2-console/**", "/actuator/**").permitAll()
+                        .requestMatchers(
+                                "/api/auth/**",
+                                "/h2-console/**",
+
+                                // ✅ Actuator
+                                "/actuator/health/**",
+                                "/actuator/prometheus"
+                        ).permitAll()
                         .anyRequest().permitAll()
                 )
                 .authenticationProvider(daoAuthenticationProvider());

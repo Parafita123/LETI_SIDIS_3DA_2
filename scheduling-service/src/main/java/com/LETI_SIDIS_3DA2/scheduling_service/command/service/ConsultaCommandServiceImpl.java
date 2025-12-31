@@ -54,7 +54,7 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
                 dto.getDateTime(),
                 60,
                 dto.getConsultationType(),
-                "PENDING",                 // <--- antes era "SCHEDULED"
+                "PENDING",                
                 dto.getNotes()
         );
 

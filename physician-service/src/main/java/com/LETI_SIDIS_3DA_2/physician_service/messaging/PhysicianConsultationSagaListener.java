@@ -72,8 +72,6 @@ public class PhysicianConsultationSagaListener {
             replyPayload.put("reason", "Physician not found");
             log.info("PhysicianAvailabilityRejected: physicianId={} não encontrado", physicianId);
         } else {
-            // 🔴 Aqui podias fazer verificação real de disponibilidade (horário, overlapping, etc.)
-            // Para efeitos de padrão SAGA, vamos assumir que está disponível.
             replyType = "PhysicianAvailabilityConfirmed";
             replyPayload.put("available", true);
             replyPayload.put("fullName", physician.getFullName());

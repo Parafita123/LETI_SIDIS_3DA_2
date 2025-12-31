@@ -50,7 +50,7 @@ Adotamos uma abordagem por domínio, com exchanges do tipo **topic**:
 - `hap.physicians` – eventos relacionados com Physician.
 - `hap.consultations` – eventos relacionados com Consultations (agendamento).
 - `hap.records` – eventos relacionados com Consultation Records.
-- Opcional: `hap.sagas` – eventos “técnicos” de coordenação de SAGAs (se fizer sentido separar dos eventos de domínio).
+- Opcional: `hap.saga` – eventos “técnicos” de coordenação de SAGAs (se fizer sentido separar dos eventos de domínio).
 
 Tipo de exchange: **topic**  
 Motivos:
