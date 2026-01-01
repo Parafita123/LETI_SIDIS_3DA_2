@@ -1,0 +1,78 @@
+@startuml
+title QUERY SIDE: Relatório Mensal (Resiliência & Observabilidade)
+
+actor "Administrador" as Admin
+participant "API Gateway\n(Ingress)" as Gateway
+participant "Scheduling\nQuery API" as QueryAPI
+database "Read DB\n(Mongo/Elastic)" as RDB
+participant "Observability\n(Prometheus/Jaeger)" as Obs
+
+autonumber
+
+box "Kubernetes Cluster (Namespace: HAP)" #eef
+    participant Gateway
+    participant QueryAPI
+    participant RDB
+    participant Obs
+end box
+
+note right of Admin
+  **Requisitos Assignment 3:**
+  - **Auth:** Role ADMIN obrigatória
+  - **Resilience:** Proteção contra queries lentas
+  - **Metrics:** Contagem de acessos a relatórios
+end note
+
+== Obtenção do Relatório (Leitura Pesada) ==
+
+Admin -> Gateway : GET /stats/monthly-report?year=2025&month=12\n[Auth: Bearer JWT]
+
+activate Gateway
+    Gateway -> Gateway : Valida Token & Role: **ADMIN**
+    Gateway -> Gateway : Gera **Trace-ID: tr-reports-01**
+
+    Gateway -> QueryAPI : GET /stats/monthly-report...\n[Header: X-Trace-ID: tr-reports-01]\n[Security: **mTLS**]
+
+    activate QueryAPI
+        QueryAPI -> Obs : Start Span (tr-reports-01)
+
+        note right of QueryAPI
+           **Resilience4j Configuration:**
+           - **TimeLimiter:** 3000ms (3s) max.
+           - **CircuitBreaker:** Se falhar 50%, abre.
+           Isto impede que relatórios matem a DB.
+        end note
+
+        QueryAPI -> RDB : aggregate([\n  { $match: { year: 2025, month: 12 } },\n  { $group: { _id: "$status", count: { $sum: 1 } } }\n])
+        activate RDB
+
+        alt Sucesso (DB responde a tempo)
+            RDB --> QueryAPI : Retorna JSON Agregado
+
+            QueryAPI -> QueryAPI : Mapeia para ReportDTO
+            QueryAPI -> Obs : Record Metric ("report_generated_success")
+
+            QueryAPI --> Gateway : 200 OK + DTO
+
+        else Timeout (> 3000ms)
+            RDB -x QueryAPI : TimeoutException
+            deactivate RDB
+
+            QueryAPI -> Obs : Record Metric ("report_timeout_error")
+            QueryAPI -> Obs : Log Error (tr-reports-01)
+
+            note right of QueryAPI
+               **Fallback:**
+               Retorna erro amigável ou dados
+               em cache se existirem.
+            end note
+
+            QueryAPI --> Gateway : 504 Gateway Timeout\n(Msg: "Relatório demorou muito a gerar.")
+        end
+
+    deactivate QueryAPI
+
+    Gateway --> Admin : Resposta JSON
+deactivate Gateway
+
+@enduml

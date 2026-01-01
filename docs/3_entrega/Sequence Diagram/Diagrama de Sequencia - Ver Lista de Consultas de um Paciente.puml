@@ -1,0 +1,88 @@
+@startuml
+title QUERY SIDE: Detalhes do Paciente (GDPR & Resiliência)
+
+actor "Médico" as User
+participant "API Gateway\n(Ingress)" as Gateway
+participant "Patient\nQuery API" as QueryAPI
+database "Read DB\n(NoSQL Projection)" as RDB
+participant "Observability\n(Jaeger/Prometheus)" as Obs
+
+autonumber
+
+box "Kubernetes Cluster (Namespace: HAP)" #eef
+    participant Gateway
+    participant QueryAPI
+    participant RDB
+    participant Obs
+end box
+
+note right of User
+  **Requisitos Assignment 3:**
+  - **GDPR:** Acesso restrito ("Need-to-know")
+  - **Audit:** Registo de acesso a dados
+  - **Resilience:** Fail-fast (Timeout)
+end note
+
+== Obtenção dos Detalhes (Leitura Segura) ==
+
+User -> Gateway : GET /patients/{patientId}\n[Auth: Bearer JWT]
+
+activate Gateway
+    Gateway -> Gateway : Valida Token & Extrai **physicianId**
+    Gateway -> Gateway : Gera **Trace-ID: tr-audit-99**
+
+    note right of Gateway
+      **Security Enforcement:**
+      O Gateway injeta o ID do médico
+      para garantir o filtro de segurança.
+    end note
+
+    Gateway -> QueryAPI : GET /patients/{patientId}\n[Header: X-Physician-ID: xyz]\n[Header: X-Trace-ID: tr-audit-99]\n[Security: **mTLS**]
+
+    activate QueryAPI
+        QueryAPI -> Obs : Start Span (tr-audit-99)
+
+        note right of QueryAPI
+           **Resilience4j:**
+           - **TimeLimiter:** 500ms
+           (Leitura por ID deve ser imediata)
+        end note
+
+        QueryAPI -> RDB : findOne({ \n  _id: patientId, \n  relatedPhysicianIds: {physicianId} \n})
+        activate RDB
+
+        alt Sucesso (Autorizado e Encontrado)
+            RDB --> QueryAPI : Documento JSON
+
+            QueryAPI -> QueryAPI : Mapeia para PatientDto
+            QueryAPI -> Obs : Record Metric ("sensitive_data_viewed")
+
+            QueryAPI --> Gateway : 200 OK + PatientDto
+            Gateway --> User : 200 OK + JSON
+
+        else Não Encontrado ou Sem Permissão
+            RDB --> QueryAPI : null
+
+            note right of QueryAPI
+               **Segurança:**
+               Retorna 404 para não revelar
+               a existência do paciente a
+               médicos não autorizados.
+            end note
+
+            QueryAPI --> Gateway : 404 Not Found
+            Gateway --> User : 404 Not Found
+
+        else Timeout (>500ms) ou Erro DB
+            RDB -x QueryAPI : TimeoutException
+            deactivate RDB
+
+            QueryAPI -> Obs : Log Error (tr-audit-99)
+            QueryAPI --> Gateway : 503 Service Unavailable
+            Gateway --> User : 503 Service Unavailable
+        end
+
+    deactivate QueryAPI
+deactivate Gateway
+
+@enduml
