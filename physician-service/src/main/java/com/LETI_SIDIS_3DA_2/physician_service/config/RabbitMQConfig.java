@@ -1,10 +1,6 @@
 package com.LETI_SIDIS_3DA_2.physician_service.config;
 
-import org.springframework.amqp.core.Binding;
-import org.springframework.amqp.core.BindingBuilder;
-import org.springframework.amqp.core.Queue;
-import org.springframework.amqp.core.QueueBuilder;
-import org.springframework.amqp.core.TopicExchange;
+import org.springframework.amqp.core.*;
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
@@ -24,35 +20,31 @@ public class RabbitMQConfig {
     @Value("${hap.messaging.physician.saga-queue}")
     private String physicianSagaQueueName;
 
-    // Exchange para eventos de physician (CQRS)
+    // Exchange de domínio (eventos physician.*)
     @Bean
     public TopicExchange physiciansExchange() {
         return new TopicExchange(physiciansExchangeName, true, false);
     }
 
-    // Exchange da SAGA (o mesmo nome usado no scheduling-service)
+    // Exchange da SAGA (hap.saga)
     @Bean
     public TopicExchange sagaExchange() {
         return new TopicExchange(sagaExchangeName, true, false);
     }
 
-    // Fila onde o physician-service vai ouvir comandos da SAGA
+    // Fila onde o physician-service ouve comandos SAGA
     @Bean
     public Queue physicianSagaQueue() {
-        return QueueBuilder
-                .durable(physicianSagaQueueName)
-                .build();
+        return QueueBuilder.durable(physicianSagaQueueName).build();
     }
 
-    // Binding da fila de SAGA ao exchange de SAGA
+    // ✅ Binding correto: scheduling envia comandos com routingKey "saga.physician"
     @Bean
-    public Binding physicianSagaBinding(Queue physicianSagaQueue,
-                                        TopicExchange sagaExchange) {
-        // Usa o mesmo padrão de routing key que o scheduling-service envia
+    public Binding physicianSagaBinding(Queue physicianSagaQueue, TopicExchange sagaExchange) {
         return BindingBuilder
                 .bind(physicianSagaQueue)
                 .to(sagaExchange)
-                .with("saga.consultation.*");
+                .with("saga.physician");
     }
 
     @Bean

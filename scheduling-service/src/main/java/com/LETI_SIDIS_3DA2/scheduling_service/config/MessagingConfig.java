@@ -21,7 +21,7 @@ public class MessagingConfig {
     @Value("${hap.messaging.scheduling.saga-queue}")
     private String schedulingSagaQueueName;
 
-    //  CQRS Read Model
+    // CQRS Read Model
     @Value("${hap.messaging.patients.exchange}")
     private String patientsExchangeName;
 
@@ -31,8 +31,7 @@ public class MessagingConfig {
     @Value("${hap.messaging.readmodel.queue}")
     private String readModelQueueName;
 
-    //Exchanges
-
+    // ---------- Exchanges ----------
     @Bean
     public TopicExchange consultationsExchange() {
         return new TopicExchange(consultationsExchangeName, true, false);
@@ -53,57 +52,64 @@ public class MessagingConfig {
         return new TopicExchange(physiciansExchangeName, true, false);
     }
 
-    //Fila da SAGA
-
+    // ---------- SAGA Queue (Scheduling Orchestrator) ----------
     @Bean
     public Queue schedulingSagaQueue() {
         return QueueBuilder.durable(schedulingSagaQueueName).build();
     }
 
+    /**
+     * Replies vindas dos participantes (patient/physician) para o orchestrator
+     * Ex: routingKey = "saga.scheduling"
+     */
     @Bean
-    public Binding schedulingSagaBinding(Queue schedulingSagaQueue,
-                                         TopicExchange sagaExchange) {
+    public Binding schedulingSagaRepliesBinding(Queue schedulingSagaQueue, TopicExchange sagaExchange) {
+        return BindingBuilder
+                .bind(schedulingSagaQueue)
+                .to(sagaExchange)
+                .with("saga.scheduling");
+    }
+
+    /**
+     * Arranque e outros eventos de saga (se usares "saga.consultation.requested", etc.)
+     * Ex: routingKey = "saga.consultation.requested"
+     */
+    @Bean
+    public Binding schedulingSagaStartBinding(Queue schedulingSagaQueue, TopicExchange sagaExchange) {
         return BindingBuilder
                 .bind(schedulingSagaQueue)
                 .to(sagaExchange)
                 .with("saga.consultation.*");
     }
 
-    //Fila para CQRS Read Model
-
+    // ---------- CQRS Read Model Queue ----------
     @Bean
     public Queue schedulingReadModelQueue() {
         return QueueBuilder.durable(readModelQueueName).build();
     }
 
-    // Ouve todos os eventos patient.*
     @Bean
-    public Binding schedulingReadModelPatientsBinding(Queue schedulingReadModelQueue,
-                                                      TopicExchange patientsExchange) {
+    public Binding schedulingReadModelPatientsBinding(Queue schedulingReadModelQueue, TopicExchange patientsExchange) {
         return BindingBuilder
                 .bind(schedulingReadModelQueue)
                 .to(patientsExchange)
                 .with("patient.*");
     }
 
-    //E todos os events physician.*
     @Bean
-    public Binding schedulingReadModelPhysiciansBinding(Queue schedulingReadModelQueue,
-                                                        TopicExchange physiciansExchange) {
+    public Binding schedulingReadModelPhysiciansBinding(Queue schedulingReadModelQueue, TopicExchange physiciansExchange) {
         return BindingBuilder
                 .bind(schedulingReadModelQueue)
                 .to(physiciansExchange)
                 .with("physician.*");
     }
 
-    // ---------- Converter JSON ----------
-
+    // ---------- JSON Converter ----------
     @Bean
     public Jackson2JsonMessageConverter jackson2JsonMessageConverter(ObjectMapper mapper) {
         return new Jackson2JsonMessageConverter(mapper);
     }
 
-    // RabbitTemplate (publisher + listener)
     @Bean
     public RabbitTemplate rabbitTemplate(ConnectionFactory connectionFactory,
                                          Jackson2JsonMessageConverter converter) {

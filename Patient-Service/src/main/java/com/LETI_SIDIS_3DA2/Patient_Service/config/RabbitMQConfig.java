@@ -11,19 +11,14 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class RabbitMQConfig {
 
-    // Exchange de domínio (eventos patient.*)
     @Value("${hap.messaging.exchanges.patients}")
     private String patientsExchangeName;
 
-    // Exchange de SAGA (hap.saga)
     @Value("${hap.messaging.saga.exchange}")
     private String sagaExchangeName;
 
-    // Fila específica deste serviço para comandos SAGA
     @Value("${hap.messaging.patient.saga-queue}")
     private String patientSagaQueueName;
-
-    // ---------- Exchanges ----------
 
     @Bean
     public TopicExchange patientsExchange() {
@@ -35,26 +30,19 @@ public class RabbitMQConfig {
         return new TopicExchange(sagaExchangeName, true, false);
     }
 
-    // ---------- Fila SAGA deste serviço ----------
-
     @Bean
     public Queue patientSagaQueue() {
         return QueueBuilder.durable(patientSagaQueueName).build();
     }
 
+    // ✅ scheduling envia "saga.patient"
     @Bean
-    public Binding patientSagaBinding(Queue patientSagaQueue,
-                                      TopicExchange sagaExchange) {
-        // MUITO IMPORTANTE: routing key tem de bater certo com o que o scheduling-service usa
-        // quando envia o comando para validar o paciente:
-        // rabbitTemplate.convertAndSend(sagaExchange, "saga.patient", validatePatient, ...)
+    public Binding patientSagaBinding(Queue patientSagaQueue, TopicExchange sagaExchange) {
         return BindingBuilder
                 .bind(patientSagaQueue)
                 .to(sagaExchange)
                 .with("saga.patient");
     }
-
-    // ---------- Converter JSON ----------
 
     @Bean
     public Jackson2JsonMessageConverter messageConverter() {
