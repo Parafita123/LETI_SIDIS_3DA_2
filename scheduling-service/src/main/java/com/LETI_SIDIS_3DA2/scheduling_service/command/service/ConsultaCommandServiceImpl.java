@@ -5,14 +5,15 @@ import com.LETI_SIDIS_3DA2.scheduling_service.client.PhysicianClient;
 import com.LETI_SIDIS_3DA2.scheduling_service.command.dto.ConsultaInputDTO;
 import com.LETI_SIDIS_3DA2.scheduling_service.command.dto.UpdateConsultaDTO;
 import com.LETI_SIDIS_3DA2.scheduling_service.domain.Consulta;
+import com.LETI_SIDIS_3DA2.scheduling_service.events.EventStoreAppender;
 import com.LETI_SIDIS_3DA2.scheduling_service.exception.ForbiddenAccessException;
 import com.LETI_SIDIS_3DA2.scheduling_service.exception.ResourceNotFoundException;
 import com.LETI_SIDIS_3DA2.scheduling_service.messaging.ConsultationEventPayload;
-import com.LETI_SIDIS_3DA2.scheduling_service.repository.ConsultaRepository;
+import com.LETI_SIDIS_3DA2.scheduling_service.messaging.ConsultationEventPublisher;
 import com.LETI_SIDIS_3DA2.scheduling_service.query.dto.ConsultaOutPutDTO;
 import com.LETI_SIDIS_3DA2.scheduling_service.query.dto.PatientDetailsDTO;
 import com.LETI_SIDIS_3DA2.scheduling_service.query.dto.PhysicianDetailsDTO;
-import com.LETI_SIDIS_3DA2.scheduling_service.messaging.ConsultationEventPublisher;
+import com.LETI_SIDIS_3DA2.scheduling_service.repository.ConsultaRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -26,15 +27,18 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
     private final PhysicianClient physicianClient;
     private final PatientClient patientClient;
     private final ConsultationEventPublisher publisher;
+    private final EventStoreAppender eventStore;
 
     public ConsultaCommandServiceImpl(ConsultaRepository consultaRepo,
                                       PhysicianClient physicianClient,
                                       PatientClient patientClient,
-                                      ConsultationEventPublisher publisher) {
+                                      ConsultationEventPublisher publisher,
+                                      EventStoreAppender eventStore) {
         this.consultaRepo = consultaRepo;
         this.physicianClient = physicianClient;
         this.patientClient = patientClient;
         this.publisher = publisher;
+        this.eventStore = eventStore;
     }
 
     @Override
@@ -45,22 +49,22 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
         }
 
         PhysicianDetailsDTO physician = physicianClient.getById(dto.getPhysicianId());
-        PatientDetailsDTO patient   = patientClient.getById(dto.getPatientId());
+        PatientDetailsDTO patient = patientClient.getById(dto.getPatientId());
 
-        // 1) criamos a consulta em estado PENDING (aguarda SAGA)
+        // 1) cria consulta em estado PENDING
         Consulta consulta = new Consulta(
                 patient.getId(),
                 physician.getId(),
                 dto.getDateTime(),
                 60,
                 dto.getConsultationType(),
-                "PENDING",                 // <--- antes era "SCHEDULED"
+                "PENDING",
                 dto.getNotes()
         );
 
         Consulta saved = consultaRepo.save(consulta);
 
-        // 2) payload mínimo para o SAGA
+        // 2) payload mínimo para saga
         ConsultationEventPayload payload = new ConsultationEventPayload(
                 saved.getId(),
                 saved.getPatientId(),
@@ -70,15 +74,26 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
                 saved.getConsultationType()
         );
 
-        // 3) evento de arranque do SAGA de marcação
+        // 3) EVENT SOURCING: guarda evento de criação
+        eventStore.append(
+                "Consulta",
+                saved.getId(),
+                "ConsultationCreated",
+                "scheduling-service",
+                payload,
+                null,
+                null
+        );
+
+        // 4) arranque da saga de marcação
         publisher.publish(
-                "hap.saga",                      // exchange de SAGA
-                "consultation.requested",         // routing key
-                "ConsultationRequested",          // eventType
+                "hap.saga",
+                "consultation.requested",
+                "ConsultationRequested",
                 payload
         );
 
-        // 4) devolvemos a consulta ainda em PENDING ao caller
+        // 5) devolve PENDING
         return toDto(saved, patient, physician);
     }
 
@@ -98,11 +113,11 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
             throw new ForbiddenAccessException("Não tem permissão para cancelar esta consulta.");
         }
 
-        // 1) marcamos como CANCELLATION_PENDING (à espera do SAGA)
+        // 1) marca como CANCELLATION_PENDING
         consulta.setStatus("CANCELLATION_PENDING");
         Consulta saved = consultaRepo.save(consulta);
 
-        // 2) payload para o SAGA
+        // 2) payload para saga
         ConsultationEventPayload payload = new ConsultationEventPayload(
                 saved.getId(),
                 saved.getPatientId(),
@@ -112,7 +127,18 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
                 saved.getConsultationType()
         );
 
-        // 3) evento de arranque do SAGA de cancelamento
+        // 3) EVENT SOURCING: guarda evento de pedido de cancelamento
+        eventStore.append(
+                "Consulta",
+                saved.getId(),
+                "ConsultationCancellationRequested",
+                "scheduling-service",
+                payload,
+                null,
+                null
+        );
+
+        // 4) publica evento de arranque da saga de cancelamento
         publisher.publish(
                 "hap.saga",
                 "consultation.cancellation.requested",
@@ -147,12 +173,23 @@ public class ConsultaCommandServiceImpl implements ConsultaCommandService {
 
         Consulta saved = consultaRepo.save(consulta);
 
-        //Publicar evento de atualização
+        // evento domínio
         publisher.publish(
                 "hap.consultations",
                 "consultation.updated",
                 "ConsultationUpdated",
                 saved
+        );
+
+        // EVENT SOURCING (opcional mas bom): guarda evento de update
+        eventStore.append(
+                "Consulta",
+                saved.getId(),
+                "ConsultationUpdated",
+                "scheduling-service",
+                saved,
+                null,
+                null
         );
 
         var physician = physicianClient.getById(saved.getPhysicianId());

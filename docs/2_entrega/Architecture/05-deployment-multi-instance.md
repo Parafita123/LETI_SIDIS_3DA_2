@@ -68,8 +68,6 @@ spring:
 rabbitmq:
   queue: patient-service.instance-1.events
 Instância 2 (application-instance-2.yml)
-yaml
-Copy code
 server:
   port: 8082
 

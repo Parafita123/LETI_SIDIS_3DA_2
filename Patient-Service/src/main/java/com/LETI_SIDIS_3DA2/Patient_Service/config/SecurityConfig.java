@@ -13,23 +13,19 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                // Sem sessão; só para evitar surpresas
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-
-                // CSRF off (necessário para H2 Console e para chamadas POST via Postman sem cookie CSRF)
                 .csrf(csrf -> csrf.disable())
-
-                // Permite o H2 Console (usa frames)
                 .headers(headers -> headers.frameOptions(frame -> frame.sameOrigin()))
-
                 .authorizeHttpRequests(auth -> auth
-                        // CORS preflight (se tiveres UI a chamar)
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
 
-                        // Endpoints públicos úteis em dev
-                        .requestMatchers("/h2-console/**", "/actuator/**").permitAll()
+                        // H2 em dev
+                        .requestMatchers("/h2-console/**").permitAll()
 
-                        // TODO: como estamos em Gateway-only, abrimos tudo internamente
+                        // ✅ Actuator mínimo
+                        .requestMatchers("/actuator/health/**", "/actuator/prometheus").permitAll()
+
+                        // Mantém a vossa decisão gateway-only / open internally
                         .anyRequest().permitAll()
                 );
 

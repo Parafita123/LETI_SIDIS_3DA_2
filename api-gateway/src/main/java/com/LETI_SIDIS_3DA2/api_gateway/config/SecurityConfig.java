@@ -12,13 +12,20 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
-                .csrf(csrf -> csrf.disable()) // gateway é stateless
+                .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/actuator/**").permitAll()
-                        .requestMatchers("/api/auth/**").permitAll()  // login, refresh, etc.
-                        .anyRequest().permitAll() // por agora, pass-through; se quiseres validar JWT no gateway, ver nota no fim
+
+                        // ✅ Actuator mínimo (para prometheus + probes)
+                        .requestMatchers("/actuator/health/**", "/actuator/prometheus").permitAll()
+
+                        // login/refresh
+                        .requestMatchers("/api/auth/**").permitAll()
+
+                        // pass-through como vocês têm agora
+                        .anyRequest().permitAll()
                 );
+
         return http.build();
     }
 }

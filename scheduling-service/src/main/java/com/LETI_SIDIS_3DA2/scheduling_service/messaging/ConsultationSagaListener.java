@@ -1,6 +1,7 @@
 package com.LETI_SIDIS_3DA2.scheduling_service.messaging;
 
 import com.LETI_SIDIS_3DA2.scheduling_service.domain.Consulta;
+import com.LETI_SIDIS_3DA2.scheduling_service.events.EventStoreAppender;
 import com.LETI_SIDIS_3DA2.scheduling_service.repository.ConsultaRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,16 +24,19 @@ public class ConsultationSagaListener {
     private final ConsultaRepository consultaRepo;
     private final RabbitTemplate rabbitTemplate;
     private final ConsultationEventPublisher eventPublisher;
+    private final EventStoreAppender eventStore;
 
     @Value("${hap.messaging.saga.exchange}")
     private String sagaExchange;
 
     public ConsultationSagaListener(ConsultaRepository consultaRepo,
                                     RabbitTemplate rabbitTemplate,
-                                    ConsultationEventPublisher eventPublisher) {
+                                    ConsultationEventPublisher eventPublisher,
+                                    EventStoreAppender eventStore) {
         this.consultaRepo = consultaRepo;
         this.rabbitTemplate = rabbitTemplate;
         this.eventPublisher = eventPublisher;
+        this.eventStore = eventStore;
     }
 
     @RabbitListener(queues = "${hap.messaging.scheduling.saga-queue}")
@@ -62,8 +66,14 @@ public class ConsultationSagaListener {
             case "PhysicianAvailabilityRejected" ->
                     handlePhysicianAvailabilityRejected(event, sagaId, correlationId);
 
-            case "ConsultationRecordsVoided" ->
-                    handleRecordsVoided(event, sagaId, correlationId);
+            case "ConsultationCancellationRequested" ->
+                    handleConsultationCancellationRequested(event, sagaId, correlationId);
+
+            case "PhysicianCancellationConfirmed" ->
+                    handlePhysicianCancellationConfirmed(event, sagaId, correlationId);
+
+            case "PhysicianCancellationRejected" ->
+                    handlePhysicianCancellationRejected(event, sagaId, correlationId);
 
             default ->
                     log.warn("Evento de SAGA desconhecido: {}", type);
@@ -78,12 +88,23 @@ public class ConsultationSagaListener {
 
         Map<String, Object> payload = event.getPayload();
 
-        Long consultaId  = ((Number) payload.get("id")).longValue();
-        Long patientId   = ((Number) payload.get("patientId")).longValue();
+        Long consultaId = ((Number) payload.get("id")).longValue();
+        Long patientId = ((Number) payload.get("patientId")).longValue();
         Long physicianId = ((Number) payload.get("physicianId")).longValue();
 
         log.info("SAGA[{}] → ConsultationRequested (consultaId={}, patientId={}, physicianId={})",
                 sagaId, consultaId, patientId, physicianId);
+
+        // EVENT STORE: regista arranque de saga
+        eventStore.append(
+                "Consulta",
+                consultaId,
+                "SagaConsultationRequested",
+                "scheduling-service",
+                payload,
+                sagaId,
+                correlationId
+        );
 
         // Comando para validar o paciente
         Map<String, Object> patientCmdPayload = new HashMap<>();
@@ -96,7 +117,7 @@ public class ConsultationSagaListener {
 
         rabbitTemplate.convertAndSend(
                 sagaExchange,
-                "saga.patient",    // queue do patient-service está ligada a esta routing key
+                "saga.patient",
                 validatePatient,
                 message -> copySagaHeaders(message, sagaId, correlationId)
         );
@@ -113,7 +134,7 @@ public class ConsultationSagaListener {
 
         rabbitTemplate.convertAndSend(
                 sagaExchange,
-                "saga.physician",  // queue do physician-service está ligada a esta routing key
+                "saga.physician",
                 checkPhysician,
                 message -> copySagaHeaders(message, sagaId, correlationId)
         );
@@ -125,6 +146,7 @@ public class ConsultationSagaListener {
         }
         if (correlationId != null) {
             message.getMessageProperties().setHeader("x-correlation-id", correlationId);
+            message.getMessageProperties().setCorrelationId(correlationId);
         }
         return message;
     }
@@ -144,15 +166,26 @@ public class ConsultationSagaListener {
             return;
         }
 
+        eventStore.append("Consulta", consultaId, "PatientValidatedForConsultation",
+                "scheduling-service", payload, sagaId, correlationId);
+
         String status = consulta.getStatus();
         if ("PENDING".equals(status)) {
             consulta.setStatus("PATIENT_CONFIRMED");
             consultaRepo.save(consulta);
-            log.info("SAGA[{}] consulta {} → estado=PATI ENT_CONFIRMED", sagaId, consultaId);
+
+            eventStore.append("Consulta", consultaId, "ConsultationStatusChanged",
+                    "scheduling-service", Map.of("status", "PATIENT_CONFIRMED"), sagaId, correlationId);
+
+            log.info("SAGA[{}] consulta {} → estado=PATIENT_CONFIRMED", sagaId, consultaId);
+
         } else if ("PHYSICIAN_CONFIRMED".equals(status)) {
-            // Já tínhamos o médico OK → agora marcamos como SCHEDULED
             consulta.setStatus("SCHEDULED");
             consultaRepo.save(consulta);
+
+            eventStore.append("Consulta", consultaId, "ConsultationScheduled",
+                    "scheduling-service", Map.of("status", "SCHEDULED"), sagaId, correlationId);
+
             log.info("SAGA[{}] consulta {} → ambos OK → SCHEDULED", sagaId, consultaId);
             publishConsultationScheduled(consulta);
         }
@@ -163,7 +196,7 @@ public class ConsultationSagaListener {
                                                String correlationId) {
         Map<String, Object> payload = event.getPayload();
         Long consultaId = ((Number) payload.get("consultaId")).longValue();
-        String reason   = (String) payload.get("reason");
+        String reason = (String) payload.get("reason");
 
         Optional<Consulta> opt = consultaRepo.findById(consultaId);
         if (opt.isEmpty()) {
@@ -175,6 +208,9 @@ public class ConsultationSagaListener {
         Consulta consulta = opt.get();
         consulta.setStatus("REJECTED");
         consultaRepo.save(consulta);
+
+        eventStore.append("Consulta", consultaId, "ConsultationRejected",
+                "scheduling-service", Map.of("reason", reason, "by", "PATIENT"), sagaId, correlationId);
 
         log.info("SAGA[{}] consulta {} → REJECTED (motivo: {})",
                 sagaId, consultaId, reason);
@@ -197,14 +233,26 @@ public class ConsultationSagaListener {
             return;
         }
 
+        eventStore.append("Consulta", consultaId, "PhysicianAvailabilityConfirmed",
+                "scheduling-service", payload, sagaId, correlationId);
+
         String status = consulta.getStatus();
         if ("PENDING".equals(status)) {
             consulta.setStatus("PHYSICIAN_CONFIRMED");
             consultaRepo.save(consulta);
+
+            eventStore.append("Consulta", consultaId, "ConsultationStatusChanged",
+                    "scheduling-service", Map.of("status", "PHYSICIAN_CONFIRMED"), sagaId, correlationId);
+
             log.info("SAGA[{}] consulta {} → estado=PHYSICIAN_CONFIRMED", sagaId, consultaId);
+
         } else if ("PATIENT_CONFIRMED".equals(status)) {
             consulta.setStatus("SCHEDULED");
             consultaRepo.save(consulta);
+
+            eventStore.append("Consulta", consultaId, "ConsultationScheduled",
+                    "scheduling-service", Map.of("status", "SCHEDULED"), sagaId, correlationId);
+
             log.info("SAGA[{}] consulta {} → ambos OK → SCHEDULED", sagaId, consultaId);
             publishConsultationScheduled(consulta);
         }
@@ -215,7 +263,7 @@ public class ConsultationSagaListener {
                                                      String correlationId) {
         Map<String, Object> payload = event.getPayload();
         Long consultaId = ((Number) payload.get("consultaId")).longValue();
-        String reason   = (String) payload.get("reason");
+        String reason = (String) payload.get("reason");
 
         Optional<Consulta> opt = consultaRepo.findById(consultaId);
         if (opt.isEmpty()) {
@@ -228,22 +276,109 @@ public class ConsultationSagaListener {
         consulta.setStatus("REJECTED");
         consultaRepo.save(consulta);
 
+        eventStore.append("Consulta", consultaId, "ConsultationRejected",
+                "scheduling-service", Map.of("reason", reason, "by", "PHYSICIAN"), sagaId, correlationId);
+
         log.info("SAGA[{}] consulta {} → REJECTED (motivo: {})",
                 sagaId, consultaId, reason);
 
         publishConsultationFailed(consulta, "PHYSICIAN_REJECTED", reason);
     }
 
-    // ------------- 4) Evento vindo do clinical-records (no futuro) -------------
+    // ------------- 4) SAGA de cancelamento -------------
 
-    private void handleRecordsVoided(DomainEvent<Map<String, Object>> event,
-                                     String sagaId,
-                                     String correlationId) {
-        // Isto seria mais relevante para o SAGA de cancelamento + clinical records
-        log.info("SAGA[{}] ConsultationRecordsVoided recebido (não tratamos ainda o cancelamento via SAGA)", sagaId);
+    private void handleConsultationCancellationRequested(DomainEvent<Map<String, Object>> event,
+                                                         String sagaId,
+                                                         String correlationId) {
+        Map<String, Object> payload = event.getPayload();
+
+        Long consultaId = ((Number) payload.get("id")).longValue();
+        Long physicianId = ((Number) payload.get("physicianId")).longValue();
+
+        log.info("SAGA[{}] → ConsultationCancellationRequested (consultaId={}, physicianId={})",
+                sagaId, consultaId, physicianId);
+
+        eventStore.append("Consulta", consultaId, "SagaCancellationRequested",
+                "scheduling-service", payload, sagaId, correlationId);
+
+        Map<String, Object> cmdPayload = new HashMap<>();
+        cmdPayload.put("consultaId", consultaId);
+        cmdPayload.put("physicianId", physicianId);
+        cmdPayload.put("dateTime", payload.get("dateTime"));
+
+        DomainEvent<Map<String, Object>> cmd =
+                new DomainEvent<>("CheckPhysicianCancellationForConsultation",
+                        "scheduling-service", cmdPayload);
+
+        rabbitTemplate.convertAndSend(
+                sagaExchange,
+                "saga.physician",
+                cmd,
+                message -> copySagaHeaders(message, sagaId, correlationId)
+        );
     }
 
-    // ------------- 5) Helpers para publicar eventos finais -------------
+    private void handlePhysicianCancellationConfirmed(DomainEvent<Map<String, Object>> event,
+                                                      String sagaId,
+                                                      String correlationId) {
+        Long consultaId = ((Number) event.getPayload().get("consultaId")).longValue();
+
+        Consulta consulta = consultaRepo.findById(consultaId).orElse(null);
+        if (consulta == null) return;
+
+        consulta.setStatus("CANCELLED");
+        consultaRepo.save(consulta);
+
+        eventStore.append("Consulta", consultaId, "ConsultationCancelled",
+                "scheduling-service", Map.of("status", "CANCELLED"), sagaId, correlationId);
+
+        log.info("SAGA[{}] consulta {} → CANCELLED (physician confirmou)", sagaId, consultaId);
+
+        eventPublisher.publish(
+                "hap.consultations",
+                "consultation.cancelled",
+                "ConsultationCancelled",
+                Map.of(
+                        "id", consulta.getId(),
+                        "patientId", consulta.getPatientId(),
+                        "physicianId", consulta.getPhysicianId(),
+                        "dateTime", consulta.getDateTime(),
+                        "status", consulta.getStatus()
+                )
+        );
+    }
+
+    private void handlePhysicianCancellationRejected(DomainEvent<Map<String, Object>> event,
+                                                     String sagaId,
+                                                     String correlationId) {
+        Map<String, Object> payload = event.getPayload();
+        Long consultaId = ((Number) payload.get("consultaId")).longValue();
+        String reason = (String) payload.get("reason");
+
+        Consulta consulta = consultaRepo.findById(consultaId).orElse(null);
+        if (consulta == null) return;
+
+        // rollback mínimo: volta a SCHEDULED (ou o estado anterior)
+        consulta.setStatus("SCHEDULED");
+        consultaRepo.save(consulta);
+
+        eventStore.append("Consulta", consultaId, "ConsultationCancellationRejected",
+                "scheduling-service", Map.of("reason", reason, "status", "SCHEDULED"), sagaId, correlationId);
+
+        log.info("SAGA[{}] consulta {} → cancellation REJECTED (reason={})", sagaId, consultaId, reason);
+
+        eventPublisher.publish(
+                "hap.consultations",
+                "consultation.cancellation.failed",
+                "ConsultationCancellationFailed",
+                Map.of(
+                        "id", consulta.getId(),
+                        "reason", reason
+                )
+        );
+    }
+
+    // ------------- Helpers domínio -------------
 
     private void publishConsultationScheduled(Consulta consulta) {
         ConsultationEventPayload payload = new ConsultationEventPayload(

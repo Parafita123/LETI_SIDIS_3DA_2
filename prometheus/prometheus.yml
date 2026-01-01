@@ -1,0 +1,33 @@
+global:
+  scrape_interval: 5s
+
+scrape_configs:
+  - job_name: "scheduling"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["scheduling-service-1:8084", "scheduling-service-2:8084"]
+
+  - job_name: "physician"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["physician-service-1:8081", "physician-service-2:8081"]
+
+  - job_name: "patient"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["patient-service-1:8083", "patient-service-2:8083"]
+
+  - job_name: "clinical-records"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["clinical-records-service-1:8082", "clinical-records-service-1:8082"]
+
+  - job_name: "identity"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["identity-service:8085", "identity-service-2:8085"]
+
+  - job_name: "gateway"
+    metrics_path: "/actuator/prometheus"
+    static_configs:
+      - targets: ["api-gateway:8086"]

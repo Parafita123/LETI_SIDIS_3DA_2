@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
+import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
+import io.github.resilience4j.retry.annotation.Retry;
 
 @Component
 public class PhysicianClient {
@@ -20,6 +22,8 @@ public class PhysicianClient {
         this.baseUrl = baseUrl;
     }
 
+    @CircuitBreaker(name = "physicianService", fallbackMethod = "fallbackGetById")
+    @Retry(name = "physicianService")
     public PhysicianDetailsDTO getById(Long physicianId) {
         try {
             return restTemplate.getForObject(baseUrl + "/" + physicianId, PhysicianDetailsDTO.class);
@@ -28,5 +32,11 @@ public class PhysicianClient {
         } catch (Exception e) {
             throw new ServiceUnavailableException("Serviço de Médicos indisponível no momento.");
         }
+    }
+
+    private PhysicianDetailsDTO fallbackGetById(Long physicianId, Throwable t) {
+        throw new ServiceUnavailableException(
+                "Falha ao contactar Physician-Service (fallback) para physicianId=" + physicianId
+        );
     }
 }
