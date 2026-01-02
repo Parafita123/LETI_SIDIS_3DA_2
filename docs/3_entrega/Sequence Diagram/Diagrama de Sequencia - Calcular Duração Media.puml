@@ -1,0 +1,65 @@
+@startuml
+title CQRS (Query Side): Estatísticas com Observabilidade e Resiliência
+
+actor "Administrador" as Admin
+participant "API Gateway" as Gateway
+participant "Scheduling Query API" as QueryAPI
+database "Scheduling Read DB\n(Proj. View)" as RDB
+participant "Observability Stack\n(Prometheus/Jaeger)" as Obs
+
+autonumber
+
+box "Kubernetes Cluster" #f0f8ff
+    participant Gateway
+    participant QueryAPI
+    participant RDB
+end box
+
+note right of Admin
+  **Segurança:** Zero Trust
+  Admin envia Token JWT.
+  Gateway -> API usa **mTLS**.
+end note
+
+== Obtenção da Estatística ==
+
+    Admin -> Gateway : GET /stats/average-duration\n(Header: Authorization Bearer <JWT>)
+
+    activate Gateway
+        Gateway -> Gateway : Valida Assinatura JWT & Role (ADMIN)
+        Gateway -> Gateway : Gera **Trace-ID** (ex: tr-999)
+
+        Gateway -> QueryAPI : GET /stats/average-duration\n(Headers: X-Trace-Id: tr-999)\n[Segurança: **mTLS**]
+
+        activate QueryAPI
+
+            QueryAPI -> Obs : Report Start Span (Trace tr-999)
+
+            note right of QueryAPI
+               **Resilience4j (Bulkhead & Timeout):**
+               Limita concorrência para proteger a DB.
+               Define timeout de 2s.
+            end note
+
+            QueryAPI -> RDB : SELECT avg(duration) ...
+            activate RDB
+
+            alt Sucesso
+                RDB --> QueryAPI : Retorna Dataset
+            else Timeout / Falha DB
+                RDB -x QueryAPI : Exception
+                QueryAPI -> QueryAPI : Fallback (Cache ou Erro Grácil)
+            end
+            deactivate RDB
+
+            QueryAPI -> QueryAPI : Mapeia para DTO
+
+            QueryAPI -> Obs : Report Metrics (Latency, Success)
+
+            QueryAPI --> Gateway : 200 OK + JSON
+        deactivate QueryAPI
+
+    Gateway --> Admin : 200 OK + JSON
+    deactivate Gateway
+
+@enduml

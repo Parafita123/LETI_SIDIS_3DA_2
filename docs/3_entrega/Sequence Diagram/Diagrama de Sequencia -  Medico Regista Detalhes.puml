@@ -1,0 +1,97 @@
+@startuml
+title COMMAND SIDE: Registar Detalhes (Saga + Event Sourcing + Audit)
+
+actor "Médico" as User
+participant "API Gateway\n(Ingress)" as Gateway
+participant "ClinicalRecord\nCommand API" as RecCmd
+database "Event Store\n(Write DB)" as EventStore
+queue "RabbitMQ\n(Broker)" as Broker
+participant "Scheduling\nService" as SchedSvc
+participant "ClinicalRecord\nQuery API" as RecQuery
+database "Read DB\n(Mongo/Elastic)" as RDB
+
+autonumber
+
+box "Kubernetes Cluster (Namespace: HAP)" #f9f9f9
+    participant Gateway
+    participant RecCmd
+    participant EventStore
+    participant Broker
+    participant SchedSvc
+    participant RecQuery
+    participant RDB
+end box
+
+note right of User
+  **Assignment 3 Requirements:**
+  - **Audit:** Histórico clínico imutável
+  - **Saga:** Atualiza estado noutros serviços
+  - **Tracing:** Trace-ID (tr-med-01)
+end note
+
+== 1. Início do Comando (Escrita Segura) ==
+
+User -> Gateway : POST /records/{apptId}/details\n{diagnóstico, receita...}
+
+activate Gateway
+    Gateway -> Gateway : Valida JWT & Extrai **physicianId**
+    Gateway -> Gateway : Gera **Trace-ID: tr-med-01**
+
+    Gateway -> RecCmd : POST /records/{apptId}...\n[Header: X-Physician-ID: ...]\n[Header: X-Trace-ID: tr-med-01]\n[mTLS]
+
+    activate RecCmd
+        note right of RecCmd
+          **Event Sourcing (Rehydrate):**
+          Carrega eventos anteriores para garantir
+          que o registo pertence a este médico
+          e não está fechado.
+        end note
+
+        RecCmd -> EventStore : Load Stream (apptId)
+        EventStore --> RecCmd : [History Events]
+
+        RecCmd -> RecCmd : Valida Regras de Negócio
+
+        RecCmd -> EventStore : **APPEND** ConsultationDetailsAddedEvent
+        activate EventStore
+            EventStore --> RecCmd : Stored (Version N+1)
+        deactivate EventStore
+
+        RecCmd -> Broker : Publish **ConsultationDetailsAddedEvent**\n[Trace-ID: tr-med-01]
+
+        RecCmd --> Gateway : 202 Accepted
+    deactivate RecCmd
+
+    Gateway --> User : 202 Accepted\n"Dados guardados."
+deactivate Gateway
+
+== 2. Saga Coreografada (Efeitos Colaterais) ==
+
+par Processamento Paralelo
+
+    group Atualização de Estado (Saga)
+        Broker -> SchedSvc : Consume DetailsAddedEvent\n[Trace-ID: tr-med-01]
+        activate SchedSvc
+            note right of SchedSvc
+               O Agendamento deteta que a consulta
+               ocorreu e muda o estado para COMPLETED.
+            end note
+            SchedSvc -> SchedSvc : Update Status -> COMPLETED
+            SchedSvc -> Broker : Publish **AppointmentCompletedEvent**
+        deactivate SchedSvc
+    end
+
+    group Projeção de Leitura (CQRS)
+        Broker -> RecQuery : Consume DetailsAddedEvent\n[Trace-ID: tr-med-01]
+        activate RecQuery
+            note right of RecQuery
+               Atualiza o documento NoSQL para
+               que o Prontuário fique visível.
+            end note
+            RecQuery -> RDB : UPSERT RecordView\n($push: { entries: newDetails })
+            RDB --> RecQuery : OK
+        deactivate RecQuery
+    end
+
+end
+@enduml
