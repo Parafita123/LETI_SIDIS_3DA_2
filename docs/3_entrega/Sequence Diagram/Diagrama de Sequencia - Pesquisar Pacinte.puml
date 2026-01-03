@@ -1,0 +1,83 @@
+@startuml
+title QUERY SIDE: Pesquisa de Pacientes (Segura & Resiliente)
+
+actor "Médico" as User
+participant "API Gateway\n(Ingress)" as Gateway
+participant "Patient\nQuery API" as QueryAPI
+database "Patient Read DB\n(NoSQL Projection)" as RDB
+participant "Observability\n(Jaeger/Prometheus)" as Obs
+
+autonumber
+
+box "Kubernetes Cluster (Namespace: HAP)" #eef
+    participant Gateway
+    participant QueryAPI
+    participant RDB
+    participant Obs
+end box
+
+note right of User
+  **Requisitos Assignment 3:**
+  - **Auth:** JWT (Zero Trust)
+  - **Privacy:** GDPR (Filtro Obrigatório)
+  - **Tracing:** Trace-ID
+  - **Resilience:** Circuit Breaker/Timeout
+end note
+
+== Pesquisa Filtrada (Leitura) ==
+
+User -> Gateway : GET /patients?name=Silva\n[Auth: Bearer JWT]
+
+activate Gateway
+    Gateway -> Gateway : Valida JWT & Extrai **physicianId**
+    Gateway -> Gateway : Gera **Trace-ID: tr-888**
+
+    note right of Gateway
+       **Enforcement:**
+       O Gateway injeta o ID do médico
+       no header para garantir que ele
+       não vê dados de outros pacientes.
+    end note
+
+    Gateway -> QueryAPI : GET /patients?name=Silva\n[Header: X-Physician-ID: 123]\n[Header: X-Trace-ID: tr-888]\n[Security: **mTLS**]
+
+    activate QueryAPI
+        QueryAPI -> Obs : Start Span (tr-888)
+
+        note right of QueryAPI
+           **Resilience4j:**
+           - **Bulkhead:** Limita concorrência
+           - **TimeLimiter:** Timeout 1000ms
+        end note
+
+        QueryAPI -> RDB : find({ \n  name: /Silva/, \n  relatedPhysicianIds: 123 \n})
+        activate RDB
+
+        alt Sucesso (Read DB Rápida)
+            RDB --> QueryAPI : Lista [PatientA, PatientB]
+            QueryAPI -> QueryAPI : Mapeia DTOs (Remove dados sensíveis)
+            QueryAPI -> Obs : Record Metric (Success)
+            QueryAPI --> Gateway : 200 OK + JSON
+
+        else Timeout ou Falha na DB
+            RDB -x QueryAPI : TimeoutException
+            deactivate RDB
+
+            QueryAPI -> Obs : Record Metric (Error)
+            QueryAPI -> Obs : Log Error (tr-888)
+
+            note right of QueryAPI
+               **Fallback:**
+               Retorna lista vazia ou erro
+               amigável, sem expor stacktrace.
+            end note
+
+            QueryAPI --> Gateway : 503 Service Unavailable\n(ou Lista Vazia com aviso)
+        end
+
+    deactivate QueryAPI
+
+    Gateway --> User : Resposta JSON
+deactivate Gateway
+
+@enduml

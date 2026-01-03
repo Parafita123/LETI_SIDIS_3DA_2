@@ -1,0 +1,127 @@
+@startuml
+title COMMAND SIDE: Atualizar ou Cancelar (Saga + Event Sourcing)
+
+actor "Paciente" as User
+participant "API Gateway\n(Ingress)" as Gateway
+participant "Scheduling\nCommand API" as SchedCmd
+database "Event Store\n(Write DB)" as EventStore
+queue "RabbitMQ\n(Broker)" as Broker
+participant "Physician\nService" as DocSvc
+participant "Scheduling\nQuery API" as SchedQuery
+database "Read DB\n(Projections)" as RDB
+
+autonumber
+
+box "Kubernetes Cluster (Namespace: HAP)" #f9f9f9
+    participant Gateway
+    participant SchedCmd
+    participant EventStore
+    participant Broker
+    participant DocSvc
+    participant SchedQuery
+    participant RDB
+end box
+
+note right of User
+  **Assignment 3 Compliance:**
+  - **Auth:** JWT Validado
+  - **Tracing:** TraceID único por pedido
+  - **Persistence:** Event Sourcing (Append Only)
+  - **Security:** mTLS entre serviços
+end note
+
+group Cenário A: Reagendar (Saga Coreografada) [Trace-ID: tr-456]
+
+    User -> Gateway : PUT /appointments/{id}\n{newDate}
+
+    activate Gateway
+        Gateway -> Gateway : Valida JWT & Gera **Trace-ID: tr-456**
+        Gateway -> SchedCmd : PUT /appointments/{id}\n[Header: X-Trace-ID: tr-456]\n[mTLS]
+    deactivate Gateway
+
+    activate SchedCmd
+        note right of SchedCmd
+          **Rehydrate State:**
+          Lê eventos passados para calcular
+          estado atual antes de validar.
+        end note
+        SchedCmd -> EventStore : Load History (Stream {id})
+        EventStore --> SchedCmd : [Created, Confirmed...]
+
+        SchedCmd -> SchedCmd : Valida Regras de Negócio
+
+        SchedCmd -> EventStore : **APPEND** RescheduleRequestedEvent
+        activate EventStore
+            EventStore --> SchedCmd : Stored
+        deactivate EventStore
+
+        SchedCmd -> Broker : Publish **RescheduleRequestedEvent**\n[Trace-ID: tr-456]
+
+        SchedCmd --> User : 202 Accepted (Processo Iniciado)
+    deactivate SchedCmd
+
+    par Processamento Paralelo
+        Broker -> DocSvc : Consume RescheduleRequested\n[Trace-ID: tr-456]
+        activate DocSvc
+            DocSvc -> DocSvc : Verifica Disponibilidade (Novo Horário)
+            DocSvc -> Broker : Publish **PhysicianAvailabilityConfirmed**\n[Trace-ID: tr-456]
+        deactivate DocSvc
+    end
+
+    Broker -> SchedCmd : Consume PhysicianAvailabilityConfirmed
+    activate SchedCmd
+        SchedCmd -> EventStore : Load History
+        SchedCmd -> EventStore : **APPEND** AppointmentRescheduledEvent
+
+        note right of SchedCmd
+           Evento final que confirma a
+           alteração de data.
+        end note
+
+        SchedCmd -> Broker : Publish **AppointmentRescheduledEvent**\n(Para atualização de leitura)
+    deactivate SchedCmd
+
+    Broker -> SchedQuery : Consume AppointmentRescheduledEvent
+    activate SchedQuery
+        SchedQuery -> RDB : UPDATE View SET date = newDate
+    deactivate SchedQuery
+
+end
+
+group Cenário B: Cancelar (Event Driven) [Trace-ID: tr-789]
+
+    User -> Gateway : DELETE /appointments/{id}
+
+    activate Gateway
+        Gateway -> Gateway : Gera **Trace-ID: tr-789**
+        Gateway -> SchedCmd : DELETE /appointments/{id}\n[mTLS]
+    deactivate Gateway
+
+    activate SchedCmd
+        SchedCmd -> EventStore : Load History (Rehydrate)
+        SchedCmd -> SchedCmd : Valida (Pode cancelar?)
+
+        SchedCmd -> EventStore : **APPEND** AppointmentCancelledEvent
+        activate EventStore
+            EventStore --> SchedCmd : Stored
+        deactivate EventStore
+
+        SchedCmd -> Broker : Publish **AppointmentCancelledEvent**\n[Trace-ID: tr-789]
+
+        SchedCmd --> User : 202 Accepted
+    deactivate SchedCmd
+
+    par Atualização de Sistemas Externos
+        Broker -> SchedQuery : Consume CancelledEvent
+        activate SchedQuery
+            SchedQuery -> RDB : DELETE / Mark as Cancelled
+        deactivate SchedQuery
+
+        Broker -> DocSvc : Consume CancelledEvent
+        activate DocSvc
+            DocSvc -> DocSvc : Liberta Horário do Médico
+        deactivate DocSvc
+    end
+
+end
+@enduml
