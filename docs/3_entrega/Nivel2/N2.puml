@@ -1,0 +1,65 @@
+@startuml
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title C4 Nível 2 - Diagrama de Containers (CQRS + Saga + Event Sourcing)
+
+Person(patient, "Paciente")
+Person(doctor, "Médico")
+Person(admin, "Administrador")
+
+System_Boundary(c1, "Sistema da Clínica HAP") {
+
+    Container(gateway, "API Gateway", "Spring Cloud Gateway", "Encaminha pedidos, gera Trace-IDs e gere segurança (mTLS).")
+
+    Container(auth_service, "Identity Service", "Keycloak/Java", "Gere autenticação e tokens JWT.")
+
+    Container(sched_service, "Scheduling Service", "Java/Spring Boot", "Comandos (Saga) e Queries de consultas.")
+
+    Container(patient_service, "Patient Service", "Java/Spring Boot", "Gere dados de pacientes e regras de negócio.")
+
+    Container(doc_service, "Physician Service", "Java/Spring Boot", "Gere disponibilidade médica.")
+
+    Container(record_service, "Clinical Records", "Java/Spring Boot", "Gere prontuários e histórico clínico.")
+
+    ContainerQueue(broker, "Message Broker", "RabbitMQ", "Transporta eventos da Saga (Created, Validated, Confirmed).")
+
+    ContainerDb(auth_db, "Auth DB", "H2", "Credenciais de utilizadores.")
+
+    ContainerDb(sched_event_store, "Event Store", "PostgreSQL", "Append-only log de eventos de agendamento.")
+    ContainerDb(sched_read_db, "Read DB", "H2", "Projeções otimizadas para leitura/estatísticas.")
+
+    ContainerDb(patient_db, "Patient DB", "H2", "Dados de pacientes.")
+    ContainerDb(doc_db, "Physician DB", "H2", "Dados de médicos.")
+    ContainerDb(record_db, "Records DB", "H2", "Documentos clínicos (Event Sourced).")
+
+}
+
+Rel(patient, gateway, "Usa", "HTTPS")
+Rel(doctor, gateway, "Usa", "HTTPS")
+Rel(admin, gateway, "Usa", "HTTPS")
+
+Rel(gateway, auth_service, "Valida Tokens", "HTTP")
+Rel(gateway, sched_service, "Agendamentos", "HTTP")
+Rel(gateway, patient_service, "Perfil Paciente", "HTTP")
+Rel(gateway, doc_service, "Perfil Médico", "HTTP")
+Rel(gateway, record_service, "Prontuário", "HTTP")
+
+Rel(auth_service, auth_db, "Lê/Escreve", "JDBC")
+Rel(patient_service, patient_db, "Lê/Escreve", "JDBC")
+Rel(doc_service, doc_db, "Lê/Escreve", "JDBC")
+
+Rel(sched_service, sched_event_store, "Append Events", "JDBC")
+Rel(sched_service, sched_read_db, "Query Views", "Mongo Driver")
+
+Rel(record_service, record_db, "Append/Read", "Mongo Driver")
+
+
+Rel(sched_service, broker, "Pub: AppointmentCreated\nSub: Validated/Confirmed", "AMQP")
+
+Rel(patient_service, broker, "Sub: AppointmentCreated\nPub: PatientValidated", "AMQP")
+
+Rel(doc_service, broker, "Sub: AppointmentCreated\nPub: PhysicianConfirmed", "AMQP")
+
+Rel(record_service, broker, "Pub: DetailsAdded", "AMQP")
+
+@enduml

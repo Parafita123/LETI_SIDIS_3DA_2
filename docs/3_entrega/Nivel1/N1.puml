@@ -1,0 +1,23 @@
+@startuml C4_Level1_Context_ClinicSystem
+
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+' Define Atores (Pessoas)
+Person(patient, "Paciente", "Um paciente registado na clínica.")
+Person(physician_actor, "Médico", "Um profissional de saúde que presta serviços.")
+Person(admin, "Administrador", "Um funcionário da clínica que gere o sistema.")
+Person(anonymous_user, "Utilizador Anónimo", "Uma pessoa que visita o sistema sem estar autenticada.")
+
+' Define o Sistema Central
+System(clinic_system, "Sistema da Clínica Hospitalar", "Permite a gestão de pacientes, médicos, agendamento de consultas e registos clínicos.")
+
+' Define Sistemas Externos (se houver)
+
+' Define as Relações
+Rel(anonymous_user, clinic_system, "Regista-se como paciente")
+Rel(patient, clinic_system, "Gere as suas consultas e pesquisa médicos")
+Rel(physician_actor, clinic_system, "Regista os detalhes clínicos das consultas")
+Rel(admin, clinic_system, "Gere médicos, pacientes, consultas e vê estatísticas")
+
+' Relação com o Sistema Externo
+@enduml
