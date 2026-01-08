@@ -1,0 +1,55 @@
+@startuml C4_Component_Physician_Optimized
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+skinparam backgroundcolor white
+title Physician Service\n[Container - C4 Level 3: Component Diagram - CQRS & Saga]
+
+Container_Boundary(physician_container, "Physician Service") {
+
+    Component(security_filter, "Security Filter", "Spring Security", "Valida JWT e mTLS")
+
+    Component(physician_controller, "Physician Controller", "Spring RestController", "Endpoints HTTP para gestão de médicos e escalas")
+
+    Component(amqp_listener, "Saga Event Listener", "Spring AMQP", "Escuta AppointmentCreatedEvent para validar disponibilidade")
+
+    Component(command_service, "Physician Command Service", "Domain Service", "Lógica de Escrita: Validação de Horários e Registo")
+
+    Component(event_publisher, "Event Publisher", "Spring AMQP", "Publica PhysicianAvailabilityConfirmed e PhysicianRegistered")
+
+    Component(query_service, "Physician Query Service", "Service", "Lógica de Leitura: Pesquisa de médicos e escalas")
+
+    Component(projector, "Physician Projector", "Event Handler", "Sincroniza Eventos para o Modelo de Leitura")
+
+    Component(event_store_repo, "Event Store Repository", "Spring Data JDBC", "Persiste eventos (Append-Only)")
+
+    Component(read_model_repo, "Read Model Repository", "Spring Data JPA", "Acede à vista otimizada de médicos")
+
+    Component(resilience, "Resilience Aspect", "Resilience4j", "Circuit Breakers para acesso à BD")
+
+}
+
+ContainerDb(h2_db, "Physician DB", "H2", "Armazena Event Store e Views de Leitura")
+ContainerQueue(broker, "RabbitMQ", "AMQP Broker", "Barramento de eventos da Saga")
+
+Rel(security_filter, physician_controller, "Auth")
+Rel(physician_controller, command_service, "Comandos (POST/PUT)")
+Rel(physician_controller, query_service, "Queries (GET)")
+
+Rel(broker, amqp_listener, "Sub: AppointmentCreated")
+Rel(amqp_listener, command_service, "Aciona verificação de agenda")
+
+Rel(command_service, event_store_repo, "Grava Evento")
+Rel(command_service, event_publisher, "Emite Evento")
+Rel(command_service, resilience, "Usa")
+
+Rel(query_service, read_model_repo, "Lê")
+Rel(query_service, resilience, "Usa")
+
+Rel(event_publisher, projector, "Notifica")
+Rel(projector, read_model_repo, "Atualiza View")
+
+Rel(event_store_repo, h2_db, "INSERT")
+Rel(read_model_repo, h2_db, "SELECT/UPSERT")
+Rel(event_publisher, broker, "Pub: AvailabilityConfirmed")
+
+@enduml

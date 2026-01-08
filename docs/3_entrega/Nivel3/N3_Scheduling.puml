@@ -1,0 +1,60 @@
+@startuml C4_Component_Scheduling_Optimized
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+skinparam backgroundcolor white
+title Scheduling Service\n[Container - C4 Level 3: Component Diagram - CQRS, Saga & ES]
+
+Container_Boundary(scheduling_container, "Scheduling Service") {
+
+    Component(security_filter, "Security Filter", "Spring Security", "Valida JWT e mTLS.")
+
+    Component(schedule_controller, "Schedule Controller", "Spring RestController", "Endpoints HTTP (POST /appointments, GET /appointments).")
+
+    Component(amqp_listener, "Saga Event Listener", "Spring AMQP / RabbitListener", "Escuta eventos de validação (PatientValidated, PhysicianConfirmed).")
+
+    Component(command_service, "Scheduling Command Service", "Domain Service", "Lógica de Escrita: Criação, Cancelamento e Reagendamento.")
+
+    Component(saga_aggregator, "Saga Aggregator", "State Machine", "Lógica de Reidratação: Carrega histórico e verifica se a Saga está completa.")
+
+    Component(event_publisher, "Event Publisher", "Spring AMQP", "Publica eventos (AppointmentCreated, Booked).")
+
+    Component(query_service, "Scheduling Query Service", "Service", "Lógica de Leitura: Obtenção de horários e relatórios.")
+
+    Component(projector, "Scheduling Projector", "Event Handler", "Sincroniza eventos de escrita para o modelo de leitura (Read Model).")
+
+    Component(event_store_repo, "Event Store Repo", "Spring Data JDBC", "Persiste eventos no PostgreSQL (Append-Only).")
+
+    Component(read_model_repo, "Read Model Repo", "Spring Data JPA", "Acede às views no H2 (Projeções).")
+
+    Component(resilience, "Resilience Aspect", "Resilience4j", "Circuit Breakers e TimeLimiter.")
+
+}
+
+ContainerDb(postgres_db, "Event Store DB", "PostgreSQL", "Log de Eventos Imutáveis")
+ContainerDb(h2_db, "Read DB", "H2", "Tabelas Otimizadas para Query")
+ContainerQueue(broker, "RabbitMQ", "Message Broker", "Barramento de Eventos")
+
+Rel(security_filter, schedule_controller, "Auth")
+Rel(schedule_controller, command_service, "Envia Comandos")
+Rel(schedule_controller, query_service, "Envia Queries")
+
+Rel(broker, amqp_listener, "Consome (Validated/Confirmed)")
+Rel(amqp_listener, command_service, "Notifica sucesso da validação")
+
+Rel(command_service, saga_aggregator, "Usa para verificar estado")
+Rel(saga_aggregator, event_store_repo, "Load History (Rehydrate)")
+Rel(command_service, event_store_repo, "Append New Event")
+Rel(command_service, event_publisher, "Publica Evento")
+Rel(command_service, resilience, "Usa")
+
+Rel(query_service, read_model_repo, "Select Views")
+Rel(query_service, resilience, "Usa")
+
+Rel(event_publisher, projector, "Dispara atualização")
+Rel(projector, read_model_repo, "Upsert View")
+
+Rel(event_store_repo, postgres_db, "JDBC (Writes)")
+Rel(read_model_repo, h2_db, "JPA (Reads)")
+Rel(event_publisher, broker, "Pub: AppointmentCreated/Booked")
+
+@enduml

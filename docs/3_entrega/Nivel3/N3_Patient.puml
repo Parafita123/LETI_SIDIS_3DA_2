@@ -1,0 +1,55 @@
+@startuml C4_Component_Patient_Optimized
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
+
+title Patient Service\n[Container - C4 Level 3: Component Diagram - CQRS & Saga]
+
+Container_Boundary(patient_container, "Patient Service") {
+
+    Component(security_filter, "Security Filter", "Spring Security", "Valida JWT e mTLS.")
+
+    Component(patient_controller, "Patient Controller", "Spring RestController", "Endpoints HTTP (POST /patients, GET /patients).")
+
+    Component(amqp_listener, "Saga Event Listener", "Spring AMQP / RabbitListener", "Escuta eventos externos (ex: AppointmentCreatedEvent).")
+
+    Component(command_service, "Patient Command Service", "Domain Service", "Lógica de Escrita: Registo, Validações da Saga, Regras de Negócio.")
+
+    Component(event_publisher, "Event Publisher", "Spring AMQP", "Publica eventos (PatientRegistered, PatientValidated).")
+
+    Component(query_service, "Patient Query Service", "Service", "Lógica de Leitura: Pesquisas e Detalhes (GDPR Filter).")
+
+    Component(projector, "Patient Projector", "Event Handler", "Transforma eventos em modelos de leitura (Read Model).")
+
+    Component(event_store_repo, "Event Store Repo", "JPA / EventStoreDB", "Persiste eventos (Append-Only).")
+
+    Component(view_repo, "Patient View Repo", "H2", "Acede à Projeção de Leitura (Query Model).")
+
+    Component(resilience, "Resilience Aspect", "Resilience4j", "Circuit Breakers e Rate Limiters para proteger a DB.")
+
+}
+
+ContainerDb(write_db, "Event Store", "H2", "Tabela de Eventos Imutáveis")
+ContainerDb(read_db, "Read DB", "H2", "Projeção Otimizada")
+ContainerQueue(broker, "RabbitMQ", "AMQP Broker", "Troca de Mensagens da Saga")
+
+Rel(security_filter, patient_controller, "Auth")
+Rel(patient_controller, command_service, "Envia Comandos (POST/PUT)")
+Rel(patient_controller, query_service, "Envia Queries (GET)")
+
+Rel(broker, amqp_listener, "Consome AppointmentCreated")
+Rel(amqp_listener, command_service, "Aciona Validação (Verifica Dívidas/Seguro)")
+
+Rel(command_service, event_store_repo, "Append Events")
+Rel(command_service, event_publisher, "Publica Eventos de Sucesso/Falha")
+Rel(command_service, resilience, "Usa")
+
+Rel(query_service, view_repo, "Lê Views")
+Rel(query_service, resilience, "Usa")
+
+Rel(event_publisher, projector, "Notifica (In-Memory ou via Broker)")
+Rel(projector, view_repo, "Atualiza/Upsert View")
+
+Rel(event_store_repo, write_db, "Grava", "JDBC")
+Rel(view_repo, read_db, "Lê", "Mongo/JDBC")
+Rel(event_publisher, broker, "Publica (PatientValidated)", "AMQP")
+
+@enduml
